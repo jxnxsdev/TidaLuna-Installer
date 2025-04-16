@@ -1,0 +1,28 @@
+{
+  "name": "tidaluna-installer",
+  "version": "1.0.0",
+  "description": "Installer for TidaLuna Tidal Client Mod",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxnxsdev/TidaLuna-Installer.git"
+  },
+  "author": "jxnxsdev",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jxnxsdev/TidaLuna-Installer/issues"
+  },
+  "homepage": "https://github.com/jxnxsdev/TidaLuna-Installer#readme",
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/express": "^5.0.1",
+    "adm-zip": "^0.5.16",
+    "express": "^5.1.0"
+  }
+}

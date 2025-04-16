@@ -1,0 +1,9 @@
+[
+    {
+        "name": "stable",
+        "download": "https://github.com/Inrixia/TidaLuna/releases/download/latest/luna.zip",
+        "githubUrl": "https://github.com/Inrixia/TidaLuna/",
+        "version": "1.0.0",
+        "id": "1"
+    }
+]
