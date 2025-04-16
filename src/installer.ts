@@ -83,10 +83,10 @@ export class TidaLunaInstaller {
                 success: true,
                 message: "TidaLuna installed successfully"
             }
-        } catch {
+        } catch(error) {
             return {
                 success: false,
-                message: "Failed to install TidaLuna"
+                message: "Failed to install TidaLuna. Error: " + error.message
             }
         }
     }
