@@ -30,7 +30,7 @@ export class TidaLunaInstaller {
                 throw new Error(`Failed to fetch releases: ${response.statusText}`)
             }
             const data = await response.json()
-            this.releases = data.releases as Release[]
+            this.releases = data as Release[]
         } catch (error) {
             console.error('Error loading releases:', error)
         }
