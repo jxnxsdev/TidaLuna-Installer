@@ -1,2 +1,4 @@
 node_modules/
 build/
+compiled/
+tsconfig.tsbuildinfo
