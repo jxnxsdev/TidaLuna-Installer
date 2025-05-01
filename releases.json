@@ -5,5 +5,12 @@
         "githubUrl": "https://github.com/Inrixia/TidaLuna/",
         "version": "1.0.0",
         "id": "1"
+    },
+    {
+        "name": "dev",
+        "download": "https://github.com/Inrixia/TidaLuna/releases/download/dev/luna.zip",
+        "githubUrl": "https://github.com/Inrixia/TidaLuna/",
+        "version": "1.0.0",
+        "id": "2"
     }
 ]
