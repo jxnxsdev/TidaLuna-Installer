@@ -13,6 +13,7 @@ import { WebsocketMessageTypes } from './enums/WebsocketMessageTypes';
 
 // Asset imports
 import { publicAssets } from './public-bundle';
+import { WebsocketMessage } from './types/WebsocketMessage';
 
 const app = express();
 const server = createServer(app);
@@ -50,11 +51,11 @@ wss.on('connection', (ws) => {
 /*
 * @description Sends a message to the frontend via the websocket connection.
 * @param message The message to send to the frontend.
-* @returns void
+* @returns {Promise<void>} A promise that resolves when the message is sent.
 */
-export async function sendMessageToFrontend(message: WebsocketMessageTypes) {
+export async function sendMessageToFrontend(message: WebsocketMessage): Promise<void> {
     if (wss.clients.size === 0) return; // No clients connected, so we don't need to send a message
-    const messageStr = await JSON.stringify(message);
+    const messageStr = JSON.stringify(message);
     wss.clients.forEach((client) => {
         if (client.readyState === ws.OPEN) {
             client.send(messageStr);

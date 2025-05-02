@@ -1,4 +1,5 @@
 import { WebsocketMessageTypes } from "../enums/WebsocketMessageTypes"
+import { StepLog } from "./StepLog";
 import { InstallLog } from "./InstallLog";
 
 /**
@@ -8,5 +9,5 @@ import { InstallLog } from "./InstallLog";
 */
 export type WebsocketMessage = {
     type: WebsocketMessageTypes;
-    data: InstallLog | string;
+    data: StepLog | InstallLog | string;
 }

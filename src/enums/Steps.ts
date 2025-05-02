@@ -7,5 +7,6 @@ export enum Steps {
     UNINSTALLING_LUNA = 'UNINSTALLING_LUNA',                // Deletes luna files from the unpacked asar directory
     UNINSTALLING_NEPTUNE = 'UNINSTALLING_NEPTUNE',          // Deletes neptune files from the unpacked asar directory
     COPYING_ASAR_UNINSTALL = 'COPYING_ASAR_UNINSTALL',      // Copying tidal's asar file to original.asar file
-    KILLING_TIDAL = 'KILLING_TIDAL'                         // Killing tidals app and player processes
+    KILLING_TIDAL = 'KILLING_TIDAL',                        // Killing tidals app and player processes
+    CHECK_IF_INSTALLED = 'CHECK_IF_INSTALLED'               // Check if the app is already installed
 }
