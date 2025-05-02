@@ -7,13 +7,23 @@ import path from 'path';
 
 // Local imports
 import { openUrl } from './utils/BrowserHelper';
+import * as manager from './InstallManager';
 
 // Type & Enum imports
 import { WebsocketMessageTypes } from './enums/WebsocketMessageTypes';
+import { WebsocketMessage } from './types/WebsocketMessage';
+import { Release } from './types/Release';
 
 // Asset imports
 import { publicAssets } from './public-bundle';
-import { WebsocketMessage } from './types/WebsocketMessage';
+
+/*
+* Release channel URL
+* This url links to a json file with all release channels. Can be used to allow users
+* the installing of different release streams, like stable, development, beta, etc.
+*/
+const releaseChannelUrl = 'https://raw.githubusercontent.com/jxnxsdev/TidaLuna-Installer/main/releases.json';
+let releases: Release[] = [];
 
 const app = express();
 const server = createServer(app);
@@ -40,6 +50,27 @@ app.use((req:express.Request, res:express.Response, next:express.NextFunction) =
     res.type(mime).send(data);
 })
 
+app.get('/state', (req:express.Request, res:express.Response) => {
+    let isRunning = manager.getIsRunning();
+    let options = manager.getOptions();
+    let currentStep = manager.getCurrentStep();
+    let currentStepIndex = manager.getCurrentStepIndex();
+    let steps = manager.getSteps();
+
+    res.json({
+        isRunning: isRunning,
+        options: options,
+        currentStep: currentStep,
+        currentStepIndex: currentStepIndex,
+        steps: steps,
+    });
+});
+
+app.get('/releases', async (req:express.Request, res:express.Response) => {
+    await fetchReleases();
+    res.json(releases);
+});
+
 // Websocket setup
 wss.on('connection', (ws) => {
     console.log('Frontend has connected to the websocket!');
@@ -61,4 +92,16 @@ export async function sendMessageToFrontend(message: WebsocketMessage): Promise<
             client.send(messageStr);
         }
     });
+}
+
+async function fetchReleases() {
+    try {
+        const response = await fetch(releaseChannelUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        releases = await response.json();
+    } catch (error) {
+        console.error('Error fetching releases:', error);
+    }
 }

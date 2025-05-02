@@ -1,24 +1,30 @@
 import { Steps } from './enums/Steps';
 import { WebsocketMessageTypes } from './enums/WebsocketMessageTypes';
-import { StepLog } from './types/StepLog';
 import { Options } from './types/Options';
 import { sendMessageToFrontend } from '.';
 import * as msg from './utils/MessageHelper';
 
-let currentStep: Steps = null;
-let steps: Steps[] = null;
-let currentStepIndex: number = null;
-let options: Options = null;
+import * as SetupStep from './Steps/Setup';
+import * as KillTidalStep from './Steps/KillTidal';
+import * as DownloadLunaStep from './Steps/DownloadLuna';
+import * as ExtractLunaStep from './Steps/ExtractLuna';
+import * as CopyAsarInstallStep from './Steps/CopyingAsarInstall';
+import * as InsertLunaStep from './Steps/InsertingLuna';
+import * as UninstallStep from './Steps/Uninstalling';
+import * as CopyAsarUninstallStep from './Steps/CopyingAsarUninstall';
+
+let currentStep: Steps | undefined;
+let steps: Steps[] = [];
+let currentStepIndex = 0;
+let options: Options | undefined;
 let isRunning = false;
 
 /**
-* @description Set's the options used for the (un)installation process.
-* @param newOptions The options to set.
-* @returns {Promise<void>} A promise that resolves when the options are set.
-*/
+ * Set the options for the (un)installation process.
+ */
 export async function setOptions(newOptions: Options): Promise<void> {
     if (isRunning) {
-        msg.globalError('Installation process is already running.', new Error('InstallManager::setOptions:: Installation process is already running.'));
+        msg.globalError('Installation process is already running.', new Error('InstallManager::setOptions'));
         return;
     }
     options = newOptions;
@@ -26,38 +32,142 @@ export async function setOptions(newOptions: Options): Promise<void> {
 }
 
 /**
-* @description Generates the install steps required for the installation process.
-* @returns {Promise<void>} A promise that resolves when the install steps are generated.
-*/
+ * Generate the sequence of install/uninstall steps.
+ */
 export async function generateInstallSteps(): Promise<void> {
     if (isRunning) {
-        msg.globalError('Installation process is already running.', new Error('InstallManager::generateInstallSteps:: Installation process is already running.'));
+        msg.globalError('Installation process is already running.', new Error('InstallManager::generateInstallSteps'));
         return;
     }
+
     if (!options) {
-        msg.globalError('Options are not set.', new Error('InstallManager::generateInstallSteps:: Options are not set.'));
+        msg.globalError('Options are not set.', new Error('InstallManager::generateInstallSteps'));
         return;
     }
 
-    steps = options.action === 'install' ? [
-        Steps.SETUP,
-        Steps.KILLING_TIDAL,
-        Steps.CHECK_IF_INSTALLED,
-        Steps.UNINSTALLING_LUNA,
-        Steps.UNINSTALLING_NEPTUNE,
-        Steps.DOWNLOADING_LUNA,
-        Steps.EXTRACTING_LUNA,
-        Steps.COPYING_ASAR_INSTALL,
-        Steps.INSERTING_LUNA
-    ] : options.action === 'uninstall' ? [
-        Steps.KILLING_TIDAL,
-        Steps.CHECK_IF_INSTALLED,
-        Steps.UNINSTALLING_LUNA,
-        Steps.UNINSTALLING_NEPTUNE,
-        Steps.COPYING_ASAR_UNINSTALL
-    ] : null;
-
-    if (!steps) {
-        msg.globalError('Invalid action.', new Error('InstallManager::generateInstallSteps:: Invalid action.'));
+    switch (options.action) {
+        case 'install':
+            steps = [
+                Steps.SETUP,
+                Steps.KILLING_TIDAL,
+                Steps.UNINSTALLING,
+                Steps.DOWNLOADING_LUNA,
+                Steps.EXTRACTING_LUNA,
+                Steps.COPYING_ASAR_INSTALL,
+                Steps.INSERTING_LUNA
+            ];
+            break;
+        case 'uninstall':
+            steps = [
+                Steps.KILLING_TIDAL,
+                Steps.UNINSTALLING,
+                Steps.COPYING_ASAR_UNINSTALL
+            ];
+            break;
+        default:
+            msg.globalError('Invalid action.', new Error('InstallManager::generateInstallSteps:: Invalid action.'));
+            return;
     }
+
+    currentStepIndex = 0;
+    currentStep = steps[currentStepIndex];
+    msg.globalLog('Install steps generated successfully.');
+}
+
+/**
+ * Start the (un)installation process.
+ */
+export async function start(): Promise<void> {
+    if (isRunning) {
+        msg.globalError('Installation process is already running.', new Error('InstallManager::start'));
+        return;
+    }
+
+    if (!steps.length || !options) {
+        msg.globalError('Install steps are not generated or options missing.', new Error('InstallManager::start'));
+        return;
+    }
+
+    isRunning = true;
+    msg.globalLog('Installation process started.');
+
+    await sendMessageToFrontend({
+        type: WebsocketMessageTypes.INSTALLATION_START,
+        data: {
+            steps,
+            currentStep,
+            currentStepIndex,
+            action: options.action
+        },
+    });
+
+    await executeCurrentStep();
+}
+
+/**
+ * Execute the current step and continue the chain if successful.
+ */
+async function executeCurrentStep(): Promise<void> {
+    const step = steps[currentStepIndex];
+    if (!step || !options) {
+        msg.installError('Invalid step or missing options.');
+        isRunning = false;
+        return;
+    }
+
+    msg.nextStep(step);
+
+    const stepMap: Record<Steps, { execute: (opts: Options) => Promise<boolean> }> = {
+        [Steps.SETUP]: SetupStep,
+        [Steps.KILLING_TIDAL]: KillTidalStep,
+        [Steps.DOWNLOADING_LUNA]: DownloadLunaStep,
+        [Steps.EXTRACTING_LUNA]: ExtractLunaStep,
+        [Steps.COPYING_ASAR_INSTALL]: CopyAsarInstallStep,
+        [Steps.INSERTING_LUNA]: InsertLunaStep,
+        [Steps.UNINSTALLING]: UninstallStep,
+        [Steps.COPYING_ASAR_UNINSTALL]: CopyAsarUninstallStep,
+    };
+
+    try {
+        const result = await stepMap[step]?.execute(options);
+        if (!result) {
+            msg.installError(`${step} step failed.`);
+            isRunning = false;
+            return;
+        }
+
+        currentStepIndex++;
+        if (currentStepIndex >= steps.length) {
+            msg.globalLog('Installation process completed successfully.');
+            msg.installComplete();
+            isRunning = false;
+            return;
+        }
+
+        currentStep = steps[currentStepIndex];
+        await executeCurrentStep();
+    } catch (error) {
+        msg.installError(`Error executing step: ${step}`);
+        isRunning = false;
+    }
+}
+
+export async function getIsRunning(): Promise<boolean> {
+    return isRunning;
+}
+
+export async function getCurrentStep(): Promise<Steps | undefined> {
+    return currentStep;
+}
+
+export async function getSteps(): Promise<Steps[]> {
+    return steps;
+}
+
+export async function getCurrentStepIndex(): Promise<number> {
+    return currentStepIndex;
+}
+
+export async function getOptions(): Promise<Options | undefined> {
+    return options;
 }

@@ -51,3 +51,32 @@ export async function globalLog(message: string): Promise<void> {
         data: log,
     });
 }
+
+export async function installationError(message: string): Promise<void> {
+    await sendMessageToFrontend({
+        type: WebsocketMessageTypes.INSTALLATION_ERROR,
+        data: message,
+    });
+}
+
+export async function nextStep(step: Steps): Promise<void> {
+    await sendMessageToFrontend({
+        type: WebsocketMessageTypes.STEP_UPDATE,
+        data: step,
+    });
+}
+
+export async function installComplete(): Promise<void> {
+    await sendMessageToFrontend({
+        type: WebsocketMessageTypes.INSTALLATION_COMPLETE,
+        data: null,
+    });
+}
+
+export async function installError(message: string): Promise<void> {
+    await sendMessageToFrontend({
+        type: WebsocketMessageTypes.INSTALLATION_ERROR,
+        data: message,
+    });
+}
+
