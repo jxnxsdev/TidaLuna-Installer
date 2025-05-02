@@ -25,7 +25,7 @@ walkDir(publicDir, (filePath) => {
 });
 
 const tsOutput = `
-// This file is auto-generated
+// This file is auto-generated and contains assets used on the frontend encoded in base64.
 export const publicAssets: Record<string, string> = ${JSON.stringify(assets, null, 2)};
 `;
 
