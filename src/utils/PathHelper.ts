@@ -22,3 +22,12 @@ export async function getTidalDirectory(): Promise<string> {
             return "";
     }
 }
+
+export async function isLunaInstalled(): Promise<boolean> {
+    const tidalPath = await getTidalDirectory();
+    if (!tidalPath) {
+        return false;
+    }
+    const appDir = path.join(tidalPath, "app");
+    return await fs.existsSync(appDir);
+}

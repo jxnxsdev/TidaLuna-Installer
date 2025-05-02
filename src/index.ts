@@ -8,11 +8,13 @@ import path from 'path';
 // Local imports
 import { openUrl } from './utils/BrowserHelper';
 import * as manager from './InstallManager';
+import { isLunaInstalled } from './utils/PathHelper';
 
 // Type & Enum imports
 import { WebsocketMessageTypes } from './enums/WebsocketMessageTypes';
 import { WebsocketMessage } from './types/WebsocketMessage';
 import { Release } from './types/Release';
+import { Options } from './types/Options';
 
 // Asset imports
 import { publicAssets } from './public-bundle';
@@ -28,6 +30,12 @@ let releases: Release[] = [];
 const app = express();
 const server = createServer(app);
 const wss = new ws.Server({ server });
+
+let options: Options = {
+    overwritePath: undefined,
+    downloadUrl: undefined,
+    action: undefined,
+}
 
 server.listen(3013, () => {
     console.log('TidaLuna Installer is running on port 3013! Open http://localhost:3013 in your browser!');
@@ -50,17 +58,17 @@ app.use((req:express.Request, res:express.Response, next:express.NextFunction) =
     res.type(mime).send(data);
 })
 
-app.get('/state', (req:express.Request, res:express.Response) => {
-    let isRunning = manager.getIsRunning();
-    let options = manager.getOptions();
-    let currentStep = manager.getCurrentStep();
-    let currentStepIndex = manager.getCurrentStepIndex();
-    let steps = manager.getSteps();
+app.get('/state', async (req:express.Request, res:express.Response) => {
+    let isRunning = await manager.getIsRunning();
+    let options = await manager.getOptions();
+    let currentStep = await manager.getCurrentStep();
+    let currentStepIndex = await manager.getCurrentStepIndex();
+    let steps = await manager.getSteps();
 
     res.json({
         isRunning: isRunning,
-        options: options,
-        currentStep: currentStep,
+        options: options ? options : {},
+        currentStep: currentStep ? currentStep : 'none',
         currentStepIndex: currentStepIndex,
         steps: steps,
     });
@@ -69,6 +77,43 @@ app.get('/state', (req:express.Request, res:express.Response) => {
 app.get('/releases', async (req:express.Request, res:express.Response) => {
     await fetchReleases();
     res.json(releases);
+});
+
+app.get('/start', async (req:express.Request, res:express.Response) => {
+    await manager.generateInstallSteps();
+    await manager.start();
+    res.status(200).send('Installation started!');
+});
+
+app.post('/setOptions', async (req:express.Request, res:express.Response) => {
+    if (!req.body || !req.body.action) {
+        res.status(400).send('No options provided!');
+        return;
+    }
+
+    const action = req.body.action;
+    const overwritePath = req.body.overwritePath || undefined;
+    const downloadUrl = action === 'install' ? req.body.downloadUrl : undefined;
+    if (action === 'install' && !downloadUrl) {
+        res.status(400).send('No download URL provided!');
+        return;
+    }
+    if (action !== 'install' && action !== 'uninstall') {
+        res.status(400).send('Invalid action provided!');
+        return;
+    }
+    options = {
+        action: action,
+        overwritePath: overwritePath,
+        downloadUrl: downloadUrl,
+    };
+    await manager.setOptions(options);
+    res.status(200).json(options);
+});
+
+app.get('/isInstalled', async (req:express.Request, res:express.Response) => {
+    const isInstalled = await isLunaInstalled();
+    res.json({ isInstalled: isInstalled });
 });
 
 // Websocket setup
