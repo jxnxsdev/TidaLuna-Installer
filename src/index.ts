@@ -9,6 +9,7 @@ import path from 'path';
 import { openUrl } from './utils/BrowserHelper';
 
 // Type & Enum imports
+import { WebsocketMessageTypes } from './enums/WebsocketMessageTypes';
 
 // Asset imports
 import { publicAssets } from './public-bundle';
@@ -51,11 +52,12 @@ wss.on('connection', (ws) => {
 * @param message The message to send to the frontend.
 * @returns void
 */
-export async function sendMessageToFrontend(message: string) {
+export async function sendMessageToFrontend(message: WebsocketMessageTypes) {
     if (wss.clients.size === 0) return; // No clients connected, so we don't need to send a message
+    const messageStr = await JSON.stringify(message);
     wss.clients.forEach((client) => {
         if (client.readyState === ws.OPEN) {
-            client.send(message);
+            client.send(messageStr);
         }
     });
 }
