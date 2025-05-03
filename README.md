@@ -1,3 +1,12 @@
+# This ReadME is outdated!! Download the latest installer (2.0.2) from Releases, the rest ist self explanatory. New Readme will be made in the next few days.
+
+
+
+
+
+
+
+
 # TidaLuna-Installer
 
 **Installer for the TidaLuna Tidal Client Mod**
