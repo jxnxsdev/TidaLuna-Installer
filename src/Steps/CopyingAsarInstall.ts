@@ -26,7 +26,7 @@ export async function execute(options: Options): Promise<boolean> {
     const originalAsarExists = fs.existsSync(originalAsarPath);
     if (!originalAsarExists) {
         msg.stepLog(Steps.COPYING_ASAR_INSTALL, 'Creating original.asar backup');
-        await helpers.moveDir(path.join(tidalPath, "app.asar"), originalAsarPath)
+        await fs.copyFileSync(originalAsarPath, path.join(tidalPath, 'app.asar'));
     }
 
     const appAsarPath = path.join(tidalPath, 'app.asar');

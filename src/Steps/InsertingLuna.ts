@@ -18,7 +18,15 @@ export async function execute(options: Options): Promise<boolean> {
     const tempDir = path.join(os.tmpdir(), 'TidaLunaInstaller');
     const tempDirLuna = path.join(tempDir, 'LunaExtracted');
     const destinationPath = path.join(tidalPath, 'app');
-    await helpers.moveDir(tempDirLuna, destinationPath);
+
+    // copy from the temp directory to the destination path
+    if (!fs.existsSync(tempDirLuna)) {
+        msg.stepError(Steps.INSERTING_LUNA, 'Temporary directory does not exist', new Error('Invalid File Path'));
+        return false;
+    }
+
+    await fs.cpSync(tempDirLuna, destinationPath, { recursive: true });
+    
     msg.stepLog(Steps.INSERTING_LUNA, 'Luna files copied successfully');
     msg.stepLog(Steps.INSERTING_LUNA, 'Cleaning up temporary files');
     try {
