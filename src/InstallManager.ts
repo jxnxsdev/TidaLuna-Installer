@@ -130,6 +130,7 @@ async function executeCurrentStep(): Promise<void> {
 
     try {
         const result = await stepMap[step]?.execute(options);
+        
         if (!result) {
             msg.installError(`${step} step failed.`);
             isRunning = false;
@@ -145,9 +146,11 @@ async function executeCurrentStep(): Promise<void> {
         }
 
         currentStep = steps[currentStepIndex];
+
+        await new Promise(r => setTimeout(r, Math.random() * 1000 + 500));
         await executeCurrentStep();
     } catch (error) {
-        msg.installError(`Error executing step: ${step}`);
+        console.log(error);
         isRunning = false;
     }
 }

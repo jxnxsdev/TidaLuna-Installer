@@ -31,7 +31,6 @@ export async function execute(options: Options): Promise<boolean> {
     msg.stepLog(Steps.EXTRACTING_LUNA, "Cleaning up temporary files");
     try {
         fs.unlinkSync(zipPath);
-        fs.rmdirSync(extractPath, { recursive: true });
     } catch (error) {
         msg.stepError(Steps.EXTRACTING_LUNA, "Error cleaning up temporary files", error as Error);
         return false;

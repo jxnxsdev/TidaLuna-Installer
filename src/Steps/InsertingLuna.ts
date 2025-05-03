@@ -22,8 +22,13 @@ export async function execute(options: Options): Promise<boolean> {
     msg.stepLog(Steps.INSERTING_LUNA, 'Luna files copied successfully');
     msg.stepLog(Steps.INSERTING_LUNA, 'Cleaning up temporary files');
     try {
-        fs.rmdirSync(tempDirLuna, { recursive: true });
-        fs.rmdirSync(tempDir, { recursive: true });
+        if (fs.existsSync(tempDir)) {
+            fs.rmdirSync(tempDir, { recursive: true });
+        }
+
+        if (fs.existsSync(tempDirLuna)) {
+            fs.rmdirSync(tempDirLuna, { recursive: true });
+        }
     } catch (error) {
         msg.stepError(Steps.INSERTING_LUNA, 'Error cleaning up temporary files', error as Error);
         return false;

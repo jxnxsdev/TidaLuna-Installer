@@ -80,20 +80,20 @@ app.get('/releases', async (req:express.Request, res:express.Response) => {
 });
 
 app.get('/start', async (req:express.Request, res:express.Response) => {
+    res.status(200).send('Installation started!');
     await manager.generateInstallSteps();
     await manager.start();
-    res.status(200).send('Installation started!');
 });
 
-app.post('/setOptions', async (req:express.Request, res:express.Response) => {
-    if (!req.body || !req.body.action) {
+app.get('/setOptions', async (req:express.Request, res:express.Response) => {
+    if (!req.query || !req.query.action) {
         res.status(400).send('No options provided!');
         return;
     }
 
-    const action = req.body.action;
-    const overwritePath = req.body.overwritePath || undefined;
-    const downloadUrl = action === 'install' ? req.body.downloadUrl : undefined;
+    const action = req.query.action;
+    const overwritePath = req.query.overwritePath || undefined;
+    const downloadUrl = action === 'install' ? req.query.downloadUrl : undefined;
     if (action === 'install' && !downloadUrl) {
         res.status(400).send('No download URL provided!');
         return;
@@ -104,7 +104,9 @@ app.post('/setOptions', async (req:express.Request, res:express.Response) => {
     }
     options = {
         action: action,
+        // @ts-expect-error
         overwritePath: overwritePath,
+        // @ts-expect-error
         downloadUrl: downloadUrl,
     };
     await manager.setOptions(options);
