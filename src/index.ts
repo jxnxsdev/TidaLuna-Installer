@@ -1,6 +1,6 @@
 // Library imports
 import express from 'express';
-import ws from 'ws';
+const WebSocket = require('ws');
 import { createServer } from 'http';
 import { Buffer } from 'buffer';
 import path from 'path';
@@ -29,7 +29,7 @@ let releases: Release[] = [];
 
 const app = express();
 const server = createServer(app);
-const wss = new ws.Server({ server });
+const wss = new WebSocket.Server({ server });
 
 let options: Options = {
     overwritePath: undefined,
@@ -119,7 +119,7 @@ app.get('/isInstalled', async (req:express.Request, res:express.Response) => {
 });
 
 // Websocket setup
-wss.on('connection', (ws) => {
+wss.on('connection', (ws: any) => {
     console.log('Frontend has connected to the websocket!');
     ws.on('close', () => {
         console.log('Frontend has disconnected from the websocket!');
@@ -134,10 +134,8 @@ wss.on('connection', (ws) => {
 export async function sendMessageToFrontend(message: WebsocketMessage): Promise<void> {
     if (wss.clients.size === 0) return; // No clients connected, so we don't need to send a message
     const messageStr = JSON.stringify(message);
-    wss.clients.forEach((client) => {
-        if (client.readyState === ws.OPEN) {
-            client.send(messageStr);
-        }
+    wss.clients.forEach((client: WebSocket) => {
+        client.send(messageStr);
     });
 }
 
