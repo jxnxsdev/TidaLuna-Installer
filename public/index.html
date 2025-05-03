@@ -6,87 +6,101 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TidaLuna Installer</title>
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
 </head>
 
 <body>
-    <div class="background">
-        <div class="gradient-sphere"></div>
-        <div class="gradient-sphere secondary"></div>
-    </div>
-
     <div class="container">
-        <header>
-            <div class="logo-container">
-                <div class="logo">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path
-                            d="M3 18C3 18 4.5 16 6 16C7.5 16 9 18 10.5 18C12 18 13.5 16 15 16C16.5 16 18 18 19.5 18C21 18 22.5 16 22.5 16"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                        <path
-                            d="M3 12C3 12 4.5 10 6 10C7.5 10 9 12 10.5 12C12 12 13.5 10 15 10C16.5 10 18 12 19.5 12C21 12 22.5 10 22.5 10"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
+        <div class="app-container">
+            <header>
+                <h1>TidaLuna Installer</h1>
+                <div class="theme-toggle">
+                    <span class="theme-icon light">☀️</span>
+                    <span class="theme-icon dark">🌙</span>
                 </div>
-                <h1>TidaLuna</h1>
-            </div>
-            <p class="subtitle">Installer</p>
-        </header>
+            </header>
 
-        <main>
-            <div class="status-container">
-                <div id="status" class="status">Select a release channel to begin</div>
-                <div id="loader" class="loader hidden">
-                    <div class="spinner"></div>
+            <!-- Setup Screen -->
+            <div id="setup-screen" class="screen active">
+                <div class="card">
+                    <h2>Global Log</h2>
+                    <div id="global-log" class="log-container"></div>
                 </div>
-            </div>
 
-            <div class="releases-container">
-                <h2>Release Channels</h2>
-                <div id="releases" class="releases">
-                    <div class="loading-placeholder">
-                        <div class="placeholder-card"></div>
-                        <div class="placeholder-card"></div>
-                        <div class="placeholder-card"></div>
+                <div class="card">
+                    <h2>Release Channel</h2>
+                    <div id="release-cards" class="release-cards-container">
+                        <!-- Release cards will be populated dynamically -->
+                        <div class="release-card loading">
+                            <div class="release-card-header">
+                                <h3>Loading...</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Installation Options</h2>
+
+                    <div class="accordion">
+                        <div class="accordion-header">
+                            <h3>Advanced Options</h3>
+                            <span class="accordion-icon">+</span>
+                        </div>
+                        <div class="accordion-content">
+                            <div class="form-group">
+                                <label for="custom-path">Custom Install Path (Optional)</label>
+                                <input type="text" id="custom-path" placeholder="Path to resources folder in app-x.x.x">
+                                <p class="help-text">Only required if installation fails. Path should point to the
+                                    resources folder inside the app-[version] folder. Use the latest semantic version.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="install-btn" class="btn primary">Install</button>
+                        <button id="uninstall-btn" class="btn secondary">Uninstall</button>
                     </div>
                 </div>
             </div>
 
-            <div class="actions">
-                <button id="install-btn" class="btn primary" disabled>
-                    <span class="btn-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                    </span>
-                    Install Selected Version
-                </button>
-                <button id="uninstall-btn" class="btn secondary">
-                    <span class="btn-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
-                            </path>
-                        </svg>
-                    </span>
-                    Uninstall TidaLuna
-                </button>
-            </div>
-        </main>
+            <!-- Progress Screen -->
+            <div id="progress-screen" class="screen">
+                <div class="card">
+                    <h2>Global Log</h2>
+                    <div id="progress-global-log" class="log-container"></div>
+                </div>
 
-        <footer>
-            <p>TidaLuna Installer by jxnxsdev</p><a href="https://github.com/jxnxsdev/TidaLuna-Installer">Github</a>
-        </footer>
+                <div class="card">
+                    <h2>Installation Progress</h2>
+                    <div id="steps-container" class="steps-container">
+                        <!-- Steps will be added dynamically -->
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button id="back-btn" class="btn secondary">Back to Setup</button>
+                </div>
+            </div>
+
+            <footer>
+                <a href="https://github.com/jxnxsdev/TidaLuna-Installer" target="_blank" class="github-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        class="github-icon">
+                        <path
+                            d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+                        </path>
+                    </svg>
+                    jxnxsdev/TidaLuna-Installer
+                </a>
+            </footer>
+        </div>
     </div>
 
-    <div id="toast" class="toast hidden">
-        <div class="toast-content">
-            <span id="toast-message"></span>
-        </div>
+    <div class="particles-container">
+        <canvas id="particles"></canvas>
     </div>
 
     <script src="script.js"></script>

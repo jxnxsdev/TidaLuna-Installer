@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/jxnxsdev/TidaLuna-Installer#readme",
   "devDependencies": {
+    "@types/ws": "^8.18.1",
     "postject": "^1.0.0-alpha.6",
     "typescript": "^5.8.3"
   },
@@ -30,6 +31,7 @@
     "@types/adm-zip": "^0.5.7",
     "@types/express": "^5.0.1",
     "adm-zip": "^0.5.16",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "ws": "^8.18.1"
   }
 }
