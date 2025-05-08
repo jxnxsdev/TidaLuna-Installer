@@ -1,16 +1,16 @@
 [
     {
-        "name": "stable",
+        "name": "latest",
         "download": "https://github.com/Inrixia/TidaLuna/releases/download/latest/luna.zip",
         "githubUrl": "https://github.com/Inrixia/TidaLuna/",
-        "version": "1.0.0",
+        "version": "latest",
         "id": "1"
     },
     {
-        "name": "dev",
-        "download": "https://github.com/Inrixia/TidaLuna/releases/download/dev/luna.zip",
+        "name": "alpha",
+        "download": "https://github.com/Inrixia/TidaLuna/releases/download/1.0.0-alpha/luna.zip",
         "githubUrl": "https://github.com/Inrixia/TidaLuna/",
-        "version": "1.0.0",
+        "version": "1.0.0-alpha",
         "id": "2"
     }
 ]
