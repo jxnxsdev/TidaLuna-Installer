@@ -1,63 +1,124 @@
-# TidaLuna-Installer
+# TidaLuna Installer
 
-**Installer for the TidaLuna Tidal Client Mod**
-
-## Important:
-
-If you encounter any errors, please refer to the FAQ section at the bottom of the page.
+Installer for the [TidaLuna](https://github.com/Inrixia/TidaLuna) Tidal Mod.
 
 ---
 
-## How to Use
+## 🚀 How to Use
 
-- **Prebuilt Binaries (Windows Only)**:  
-  Prebuilt binaries are available for Windows. Simply download and run them from the [Releases Page](http://localhost:3000).  
-  A website should open in your browser. If it doesn't, manually open `http://localhost:3000`.
-
-- **Windows Smart Screen Warning**:  
-  If Windows Smart Screen pops up warning that the app might be malicious, click on **More Info** and then **Run Anyway**.  
-  This app is not malicious - Windows shows this because I don't want to pay hundreds of euros per year to Microsoft for an official signature.
-
-> **ATTENTION:** Make sure **Tidal** is closed before proceeding!
-
-- **Running the App**:  
-  When the app is running, select a release channel and click **Install**.
+The installer should™ work on both **Windows** and **macOS**.  
+Currently, **precompiled binaries are available for Windows only**.
 
 ---
 
-## macOS Instructions (Untested)
+### 🪟 Windows
 
-The installer should also work on Mac. To use it:
+#### 🔧 Installing
 
-1. Clone this GitHub repo.
-2. Install **Node.js 20**.
-3. Run `npm install`.
-4. Build the project with `npm run tsc` and then `node build`.
+1. Download the precompiled binary from the [Releases page](https://github.com/jxnxsdev/TidaLuna-Installer/releases).  
+   ![Download Release](images/github_compiled_download.png)
+
+2. Run the downloaded `installer-windows.exe`.  
+   You might encounter a Windows SmartScreen warning. Click **"More info"** and then **"Run anyway"**.  
+   A browser window should open automatically. If it doesn't, open `http://localhost:3013` manually.  
+   ![SmartScreen Warning](images/smartscreen.png)  
+   ![SmartScreen More Info](images/smartscreen_more.png)
+
+3. **Close Tidal** before continuing.
+
+4. Select a **release channel**. These include `Stable`, `Pre-release`, and `Dev` versions.  
+   ![Release Channels](images/releases.png)
+
+5. (Optional) Click on **Advanced Options** if you need to configure installation paths or debug issues.  
+   More on that in the [Advanced Options](#advanced-options) section.
+
+6. Click **Install** or **Reinstall** to begin the installation.  
+   ![Install/Reinstall Buttons](images/buttons.png)
 
 ---
 
-## FAQ
+#### ❌ Uninstalling
 
-### 1. The App Crashes on Startup
+1. Download the precompiled binary from the [Releases page](https://github.com/jxnxsdev/TidaLuna-Installer/releases).  
+   ![Download Release](images/github_compiled_download.png)
 
-Make sure that **nothing** is running on port 3000.
+2. Run the downloaded `installer-windows.exe`.  
+   ![SmartScreen Warning](images/smartscreen.png)  
+   ![SmartScreen More Info](images/smartscreen_more.png)
 
-### 2. I Can’t Open the Webpage
+3. **Close Tidal**
 
-Ensure that you are using **http** (not https) to access it. Additionally, check that your firewall isn’t blocking the connection.
+4. Click the **Uninstall** button at the bottom of the page.  
+   ![Install/Reinstall Buttons](images/buttons.png)
 
-### 3. The Installer Shows an Error When I Click Install
+---
 
-This typically happens if **Tidal** is still running.
+### 🍏 macOS
 
-- Open **Task Manager** to ensure Tidal is fully closed.
-- If the installer doesn’t work immediately, wait a few minutes - Windows sometimes takes time to recognize that files are no longer in use.
-- If the issue persists after 2-3 minutes, try running the installer as **Administrator** to grant the app the necessary permissions to edit Tidal’s files.
+> ⚠️ The installer is **untested on macOS**. It should theoretically work, but has not been verified.  
+> If you're on macOS and willing to test, feel free to contribute!
 
-Other Reasons can be that Tidal is not installed in the default location. A feature to set a custom location will be implemented soon™
+#### 📦 Requirements
 
-### 4. The Installer Says `original.asar` is Missing When Trying to Uninstall
+- Node.js v20
+- npm (usually bundled with Node.js)
+- This project cloned or downloaded
 
-This indicates that your installation is broken. To resolve this:
+---
 
-- Uninstall and then reinstall Tidal.
+#### 📁 Downloading the Project
+
+1. Scroll to the top of the [repository page](https://github.com/jxnxsdev/TidaLuna-Installer)
+2. Click the green **Code** button
+3. Select **"Download ZIP"**  
+   ![Download ZIP](images/github_download.png)
+
+---
+
+#### 📥 Installing Dependencies
+
+1. Open a terminal inside the base project folder
+2. Run:
+
+   ```bash
+   npm install
+   ```
+
+---
+
+#### ▶️ Running the App
+
+1. Build the TypeScript code:
+
+   ```bash
+   npm run tsc
+   ```
+
+2. Start the app:
+
+   ```bash
+   node ./build/index.js
+   ```
+
+> After this point, the usage is the same as on Windows.
+
+---
+
+## ⚙️ Advanced Options
+
+If the installer cannot locate your Tidal installation, you can manually specify the path.
+
+1. Locate your **Tidal install directory**
+2. Navigate into the `app-*` folder (e.g., `app-5.12.0`)
+3. Copy the path to the **`resources`** folder inside it  
+   ![Advanced Options](images/advanced_options.png)  
+   ![Tidal Folder](images/tidal_folder.png)  
+   ![Tidal Resources Folder](images/tidal_resources.png)
+
+If you’re unfamiliar with versioning formats, check out [semver.org](https://semver.org/) for a quick guide.
+
+---
+
+## 📎 License
+
+MIT — see [LICENSE](./LICENSE) file for details.
