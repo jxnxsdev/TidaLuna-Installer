@@ -2,7 +2,7 @@ name: Update Releases JSON
 
 on:
   schedule:
-    - cron: "*/15 * * * *" # Every 15 minutes
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -23,42 +23,35 @@ jobs:
       - name: Install dependencies
         run: npm install axios semver
 
-      - name: Create update script
+      - name: Generate releases.json
         run: |
-          cat > update.js <<'EOF'
+          node -e "
           const axios = require('axios');
           const semver = require('semver');
           const fs = require('fs');
 
-          const GITHUB_REPO = 'Inrixia/TidaLuna';
+          (async () => {
+              const res = await axios.get('https://api.github.com/repos/Inrixia/TidaLuna/releases');
+              const releases = res.data;
 
-          async function getReleases() {
-              const res = await axios.get(`https://api.github.com/repos/${GITHUB_REPO}/releases`);
-              return res.data;
-          }
-
-          function classifyReleases(releases) {
               const channels = {};
               const semverReleases = [];
 
               for (const rel of releases) {
                   const tag = rel.tag_name;
-                  const zipUrl = rel.assets.find(a => a.name === 'luna.zip')?.browser_download_url;
-                  if (!zipUrl) continue;
+                  const zip = rel.assets.find(a => a.name === 'luna.zip');
+                  if (!zip) continue;
+
+                  const url = zip.browser_download_url;
+                  const gh = rel.html_url;
 
                   if (semver.valid(tag)) {
-                      semverReleases.push({ version: tag, url: zipUrl, githubUrl: rel.html_url });
-                      continue;
-                  }
-
-                  const match = tag.match(/^([a-zA-Z]+)-?(\d+\.\d+\.\d+)?$/);
-                  if (match) {
-                      const channel = match[1];
-                      if (!channels[channel]) channels[channel] = [];
-                      channels[channel].push({ version: tag, url: zipUrl, githubUrl: rel.html_url });
+                      semverReleases.push({ version: tag, url, githubUrl: gh });
                   } else {
-                      if (!channels[tag]) channels[tag] = [];
-                      channels[tag].push({ version: tag, url: zipUrl, githubUrl: rel.html_url });
+                      const match = tag.match(/^([a-zA-Z]+)-?(\d+\.\d+\.\d+)?$/);
+                      const channel = match ? match[1] : tag;
+                      channels[channel] = channels[channel] || [];
+                      channels[channel].push({ version: tag, url, githubUrl: gh });
                   }
               }
 
@@ -67,15 +60,8 @@ jobs:
                   channels['semantic'] = [latest];
               }
 
-              return channels;
-          }
-
-          async function main() {
-              const releases = await getReleases();
-              const channels = classifyReleases(releases);
-
               const output = [];
-              let idCounter = 1;
+              let id = 1;
 
               for (const [channel, items] of Object.entries(channels)) {
                   for (const item of items) {
@@ -84,7 +70,7 @@ jobs:
                           download: item.url,
                           githubUrl: item.githubUrl,
                           version: item.version,
-                          id: idCounter++,
+                          id: id++
                       });
                   }
               }
@@ -93,21 +79,10 @@ jobs:
               const oldJson = fs.existsSync('releases.json') ? fs.readFileSync('releases.json', 'utf8') : '';
               if (newJson.trim() !== oldJson.trim()) {
                   fs.writeFileSync('releases.json', newJson);
-                  console.log('RELEASES_CHANGED=true');
                   fs.writeFileSync('changed.txt', 'yes');
-              } else {
-                  fs.writeFileSync('changed.txt', '');
               }
-          }
-
-          main().catch(err => {
-              console.error(err);
-              process.exit(1);
-          });
-          EOF
-
-      - name: Run update script
-        run: node update.js
+          })();
+          "
 
       - name: Create PR if changed
         if: success() && hashFiles('changed.txt') != ''
@@ -118,3 +93,5 @@ jobs:
           body: "Automatically updated releases.json from upstream releases."
           branch: update-releases
           base: main
+          add-paths: |
+            releases.json
