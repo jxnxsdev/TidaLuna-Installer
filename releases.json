@@ -1,8 +1,8 @@
 [
     {
-        "name": "alpha",
+        "name": "1.0.2-alpha",
         "download": "https://github.com/Inrixia/TidaLuna/releases/download/1.0.2-alpha/luna.zip",
-        "githubUrl": "https://github.com/Inrixia/TidaLuna/",
+        "githubUrl": "https://github.com/Inrixia/TidaLuna/releases/tag/1.0.2-alpha",
         "version": "1.0.2-alpha",
         "id": "1"
     }
