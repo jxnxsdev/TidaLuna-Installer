@@ -70,7 +70,7 @@ jobs:
                           download: item.url,
                           githubUrl: item.githubUrl,
                           version: item.version,
-                          id: id++
+                          id: String(id++)
                       });
                   }
               }
