@@ -151,6 +151,7 @@ async function executeCurrentStep(): Promise<void> {
         await executeCurrentStep();
     } catch (error) {
         console.log(error);
+        msg.installError(`Error executing step ${step}: ${error.message}`);
         isRunning = false;
     }
 }
