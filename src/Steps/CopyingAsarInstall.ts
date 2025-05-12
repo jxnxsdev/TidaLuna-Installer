@@ -32,7 +32,7 @@ export async function execute(options: Options): Promise<boolean> {
             return false;
         }
         msg.stepLog(Steps.COPYING_ASAR_INSTALL, 'Creating original.asar backup');
-        await fs.copyFileSync(originalAsarPath, path.join(tidalPath, 'app.asar'));
+        await fs.copyFileSync(path.join(tidalPath, 'app.asar'), originalAsarPath);
     }
 
     if (await fs.existsSync(appAsarPath)) {
