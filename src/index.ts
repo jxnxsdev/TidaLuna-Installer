@@ -18,13 +18,14 @@ import { Options } from './types/Options';
 
 // Asset imports
 import { publicAssets } from './public-bundle';
+// node-fetch import to every releases of the repository
+import fetch from 'node-fetch';
 
 /*
 * Release channel URL
 * This url links to a json file with all release channels. Can be used to allow users
 * the installing of different release streams, like stable, development, beta, etc.
 */
-const releaseChannelUrl = 'https://raw.githubusercontent.com/Tr3yWay996/TidaLuna-Installer_reloaded/refs/heads/main/releases.json';
 let releases: Release[] = [];
 
 const app = express();
@@ -37,12 +38,32 @@ let options: Options = {
     action: undefined,
 }
 
-server.listen(65530, () => {
-    console.log('TidaLuna Installer is running on port 65530! Open http://localhost:65530 in your browser!');
-    openUrl('http://localhost:65530').catch((err) => {
+const portfinder = require('portfinder');
+
+// Set a base port to try first
+portfinder.basePort = 3013;
+
+// Use portfinder to get an available port then start the server
+portfinder.getPortPromise()
+  .then((port: number) => {
+    server.listen(port, () => {
+      console.log(`TidaLuna Installer is running on port ${port}! Open http://localhost:${port} in your browser!`);
+      openUrl(`http://localhost:${port}`).catch((err) => {
         console.error('Failed to open URL:', err);
+      });
     });
-});
+  })
+  .catch((err: unknown) => {
+    console.error('Failed to find available port:', err);
+    // Fallback to a different port if portfinder fails
+    const fallbackPort = 3000;
+    server.listen(fallbackPort, () => {
+      console.log(`Fallback: TidaLuna Installer is running on port ${fallbackPort}! Open http://localhost:${fallbackPort} in your browser!`);
+      openUrl(`http://localhost:${fallbackPort}`).catch((err: unknown) => {
+        console.error('Failed to open URL:', err);
+      });
+    });
+  });
 
 // Express middleware to handle Sending encoded files to the client
 // Required because the files need to be packageed into the binary
@@ -139,14 +160,47 @@ export async function sendMessageToFrontend(message: WebsocketMessage): Promise<
     });
 }
 
+interface GitHubRelease {
+  tag_name: string;
+  html_url: string;
+  zipball_url: string;
+  assets: Array<{
+    name: string;
+    browser_download_url: string;
+  }>;
+}
+
+// Then modify your fetchReleases function
 async function fetchReleases() {
-    try {
-        const response = await fetch(releaseChannelUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        releases = await response.json();
-    } catch (error) {
-        console.error('Error fetching releases:', error);
+  try {
+    // Fetch releases directly from GitHub API
+    const response = await fetch('https://api.github.com/repos/Inrixia/TidaLuna/releases');
+    
+    if (!response.ok) {
+      throw new Error(`GitHub API error: ${response.status}`);
     }
+    
+    const githubReleases = await response.json() as GitHubRelease[];
+    
+    // Transform the GitHub API response to the format your app expects
+    releases = githubReleases.map((release, index) => ({
+      id: String(index + 1),
+      name: release.tag_name,
+      version: release.tag_name,
+      download: release.assets.find(asset => asset.name === 'luna.zip')?.browser_download_url || release.zipball_url,
+      githubUrl: release.html_url
+    }));
+    
+    console.log(`Fetched ${releases.length} releases from GitHub`);
+  } catch (error) {
+    console.error('Error fetching releases from GitHub:', error);
+    // Fallback to a basic release if GitHub API fails
+    releases = [{
+      id: "1",
+      name: "latest",
+      version: "latest",
+      download: "https://github.com/Inrixia/TidaLuna/releases/latest/download/luna.zip",
+      githubUrl: "https://github.com/Inrixia/TidaLuna/releases/latest"
+    }];
+  }
 }
