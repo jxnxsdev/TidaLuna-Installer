@@ -21,7 +21,7 @@ Currently, **precompiled binaries are available for Windows only**.
 
 2. Run the downloaded `installer-windows.exe`.  
    You might encounter a Windows SmartScreen warning. Click **"More info"** and then **"Run anyway"**.  
-   A browser window should open automatically. If it doesn't, open `http://localhost:3013` manually.  
+   A browser window should open automatically. If it doesn't, open `http://localhost:65530` manually.  
    ![SmartScreen Warning](images/smartscreen.png)  
    ![SmartScreen More Info](images/smartscreen_more.png)
 

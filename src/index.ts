@@ -24,7 +24,7 @@ import { publicAssets } from './public-bundle';
 * This url links to a json file with all release channels. Can be used to allow users
 * the installing of different release streams, like stable, development, beta, etc.
 */
-const releaseChannelUrl = 'https://raw.githubusercontent.com/jxnxsdev/TidaLuna-Installer/main/releases.json';
+const releaseChannelUrl = 'https://raw.githubusercontent.com/Tr3yWay996/TidaLuna-Installer_reloaded/refs/heads/main/releases.json';
 let releases: Release[] = [];
 
 const app = express();
@@ -37,9 +37,9 @@ let options: Options = {
     action: undefined,
 }
 
-server.listen(3013, () => {
-    console.log('TidaLuna Installer is running on port 3013! Open http://localhost:3013 in your browser!');
-    openUrl('http://localhost:3013').catch((err) => {
+server.listen(65530, () => {
+    console.log('TidaLuna Installer is running on port 65530! Open http://localhost:65530 in your browser!');
+    openUrl('http://localhost:65530').catch((err) => {
         console.error('Failed to open URL:', err);
     });
 });
