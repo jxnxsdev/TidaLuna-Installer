@@ -176,6 +176,7 @@ h3 {
     position: relative;
 }
 
+/* Fix dropdown styling for light and dark mode */
 select {
     width: 100%;
     padding: 0.75rem 1rem;
@@ -189,20 +190,12 @@ select {
     transition: border-color var(--transition-speed);
 }
 
-select:focus {
+/* Remove white border around context menu */
+select option {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border: none;
     outline: none;
-    border-color: var(--primary-color);
-}
-
-.select-container::after {
-    content: "▼";
-    position: absolute;
-    right: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    pointer-events: none;
-    color: var(--text-secondary);
-    font-size: 0.75rem;
 }
 
 .form-group {
@@ -392,34 +385,42 @@ input[type="text"]:focus {
     margin-top: 1rem;
 }
 
+/* Add wrapper for card and GitHub container */
+.release-card-wrapper {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 1rem;
+}
+
+/* Update card styling to be less bright */
 .release-card {
-    background-color: var(--background-color);
-    border: 2px solid var(--border-color);
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
     border-radius: 0.75rem;
     padding: 1rem;
     cursor: pointer;
     transition: all var(--transition-speed);
     position: relative;
     overflow: hidden;
+    box-shadow: 0 2px 5px var(--shadow-color);
 }
 
 .release-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 5px 15px var(--shadow-color);
+    box-shadow: 0 5px 10px var(--shadow-color);
 }
 
 .release-card.selected {
     border-color: var(--primary-color);
-    background-color: var(--primary-color);
-    color: white;
+    background-color: rgba(99, 102, 241, 0.1);
+    /* More subtle background */
+    color: var(--text-color);
+    border-radius: 0.75rem 0.75rem 0 0;
 }
 
-.release-card.selected .github-link {
-    color: rgba(255, 255, 255, 0.8);
-}
-
-.release-card.selected .github-link:hover {
-    color: white;
+.dark-theme .release-card.selected {
+    background-color: rgba(129, 140, 248, 0.2);
+    /* More subtle background for dark mode */
 }
 
 .release-card-header {
@@ -427,6 +428,93 @@ input[type="text"]:focus {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 0.75rem;
+}
+
+/* Improve dropdown styling */
+.custom-select-container {
+    position: relative;
+    width: 100%;
+}
+
+.version-select {
+    width: 100%;
+    padding: 0.5rem 2rem 0.5rem 0.75rem;
+    /* Add padding for the arrow */
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: border-color var(--transition-speed);
+    appearance: none;
+    /* Remove default arrow */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+/* Add dropdown arrow */
+.dropdown-arrow {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+.release-card.selected .dropdown-arrow {
+    color: var(--text-color);
+}
+
+/* Fix dropdown styling for dark mode */
+.release-card.selected .version-select {
+    border-color: var(--border-color);
+    background-color: var(--card-bg);
+    color: var(--text-color);
+}
+
+/* Fix dropdown menu styling for all themes */
+select option {
+    background-color: var(--card-bg) !important;
+    color: var(--text-color) !important;
+    border: none !important;
+    outline: none !important;
+}
+
+/* Fix dropdown styling for light mode */
+.version-select option {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border: none;
+}
+
+/* Add select button styling */
+.select-button {
+    width: 100%;
+    padding: 0.5rem;
+    margin-top: 0.75rem;
+    border-radius: 0.5rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color var(--transition-speed);
+}
+
+.select-button:hover {
+    background-color: var(--primary-hover);
+}
+
+.release-card.selected .select-button {
+    background-color: var(--primary-hover);
+}
+
+.release-card.selected .select-button:hover {
+    background-color: var(--primary-color);
+    opacity: 0.9;
 }
 
 .version-badge {
@@ -466,28 +554,58 @@ input[type="text"]:focus {
     height: 16px;
 }
 
+/* GitHub container styling - make it smaller */
+.github-container {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-radius: 0 0 0.75rem 0.75rem;
+    padding: 0.5rem;
+    /* Smaller padding */
+    margin-top: -1px;
+    text-align: center;
+    animation: fadeIn 0.3s ease;
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    box-shadow: 0 2px 5px var(--shadow-color);
+}
+
 footer {
     padding: 1.5rem;
     border-top: 1px solid var(--border-color);
     text-align: center;
 }
 
+/* Make GitHub link smaller */
 .github-link {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
     color: var(--text-secondary);
     text-decoration: none;
-    transition: color var(--transition-speed);
+    transition: all var(--transition-speed);
+    padding: 0.35rem 0.75rem;
+    /* Smaller padding */
+    border-radius: 0.5rem;
+    background-color: var(--background-color);
+    width: 100%;
+    font-weight: 500;
+    font-size: 0.8rem;
+    /* Smaller font */
 }
 
 .github-link:hover {
     color: var(--primary-color);
+    background-color: var(--border-color);
 }
 
 .github-icon {
-    width: 20px;
-    height: 20px;
+    width: 14px;
+    /* Smaller icon */
+    height: 14px;
+    /* Smaller icon */
 }
 
 @keyframes fadeIn {
