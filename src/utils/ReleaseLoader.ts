@@ -24,27 +24,32 @@ async function processDirectReleaseSource(source: ReleaseSource): Promise<Releas
     return data.releases;
 }
 
+
 /**
- * Extracts a release channel name from a version tag.
- * - "1.0.0" => "1.0.0"
- * - "1.0.0-alpha" or "alpha-1.0.0" => "alpha-1.0.0"
- * - "alpha" => "alpha"
+ * Extracts the release channel name from a tag.
+ * For example: "1.2.3-alpha", "alpha-1.2.3", "dev" → "alpha", "alpha", "dev"
  */
-function extractReleaseChannel(tag: string): string {
-    const cleanTag = tag.replace(/^v/, ''); // Remove leading 'v'
+function extractChannelName(tag: string): string {
+    const clean = tag.replace(/^v/, '');
 
-    // Exact semver: "1.0.0"
-    if (semver.valid(cleanTag)) return cleanTag;
+    // Try to parse as semver and get prerelease label
+    const parsed = semver.parse(clean);
+    if (parsed && parsed.prerelease.length > 0) {
+        const first = String(parsed.prerelease[0]);
+        return first.split(/[-.]/)[0]; // e.g., "alpha-hotfix" → "alpha"
+    }
 
-    // Semver with pre-release: "1.0.0-alpha"
-    if (semver.valid(cleanTag.split(/[-]/).pop() || '')) return cleanTag;
+    // Try matching "alpha-1.2.3" format
+    const match = clean.match(/^([a-zA-Z]+)[-_]\d/);
+    if (match) return match[1];
 
-    // Possibly "alpha-1.0.0" -> capture as-is
-    if (cleanTag.includes('-') && semver.valid(cleanTag.split('-').pop() || '')) return cleanTag;
+    // Valid semver with no prerelease → stable
+    if (semver.valid(clean)) return "stable";
 
-    // Fallback to full tag (e.g. "alpha")
-    return cleanTag;
+    // Fallback: whole tag
+    return clean;
 }
+
 
 /**
  * Loads releases from GitHub and groups them into release channels
@@ -54,46 +59,39 @@ function extractReleaseChannel(tag: string): string {
 export async function processGithubReleaseSource(source: ReleaseSource): Promise<Release[]> {
     const releaseUrl = `https://api.github.com/repos/${source.url}/releases`;
     const response = await fetch(releaseUrl);
-
     if (!response.ok) {
         console.error(`Failed to fetch release data from ${releaseUrl}: ${response.statusText}`);
         return [];
     }
 
-    const githubReleases = await response.json();
+    const data = await response.json();
 
-    const grouped: Map<string, ReleaseVersion[]> = new Map();
+    const grouped: Map<string, Release> = new Map();
 
-    for (const ghRelease of githubReleases) {
-        const tagName: string = ghRelease.tag_name;
-        const downloadUrl: string | undefined = ghRelease.assets?.[0]?.browser_download_url;
+    for (const release of data) {
+        const tag = release.tag_name;
+        const channelName = extractChannelName(tag);
 
-        if (!downloadUrl) continue;
+        const version: ReleaseVersion = {
+            version: tag,
+            download: `https://github.com/${source.url}/releases/download/${tag}/luna.zip`
+        };
 
-        const channel = extractReleaseChannel(tagName);
-
-        if (!grouped.has(channel)) {
-            grouped.set(channel, []);
+        if (!grouped.has(channelName)) {
+            grouped.set(channelName, {
+                name: channelName,
+                githubUrl: `https://github.com/${source.url}`,
+                id: uuidv4(),
+                versions: [version]
+            });
+        } else {
+            grouped.get(channelName)!.versions.push(version);
         }
-
-        grouped.get(channel)!.push({
-            version: tagName,
-            download: downloadUrl
-        });
     }
 
-    const releases: Release[] = [];
-    for (const [channel, versions] of grouped) {
-        releases.push({
-            name: channel,
-            githubUrl: `https://github.com/${source.url}`,
-            id: uuidv4(),
-            versions
-        });
-    }
-
-    return releases;
+    return Array.from(grouped.values());
 }
+
 
 /**
  * Loads releases from the sources defined in the sources.json file
