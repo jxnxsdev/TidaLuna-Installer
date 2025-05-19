@@ -9,23 +9,16 @@ import path from 'path';
 import { openUrl } from './utils/BrowserHelper';
 import * as manager from './InstallManager';
 import { isLunaInstalled } from './utils/PathHelper';
+import { loadReleases } from './utils/ReleaseLoader';
 
 // Type & Enum imports
 import { WebsocketMessageTypes } from './enums/WebsocketMessageTypes';
 import { WebsocketMessage } from './types/WebsocketMessage';
-import { Release } from './types/Release';
+import { Release, ReleaseVersion } from './types/Release';
 import { Options } from './types/Options';
 
 // Asset imports
 import { publicAssets } from './public-bundle';
-
-/*
-* Release channel URL
-* This url links to a json file with all release channels. Can be used to allow users
-* the installing of different release streams, like stable, development, beta, etc.
-*/
-const releaseChannelUrl = 'https://raw.githubusercontent.com/jxnxsdev/TidaLuna-Installer/main/releases.json';
-let releases: Release[] = [];
 
 const app = express();
 const server = createServer(app);
@@ -75,7 +68,7 @@ app.get('/state', async (req:express.Request, res:express.Response) => {
 });
 
 app.get('/releases', async (req:express.Request, res:express.Response) => {
-    await fetchReleases();
+    const releases: Release[] = await loadReleases();
     res.json(releases);
 });
 
@@ -137,16 +130,4 @@ export async function sendMessageToFrontend(message: WebsocketMessage): Promise<
     wss.clients.forEach((client: WebSocket) => {
         client.send(messageStr);
     });
-}
-
-async function fetchReleases() {
-    try {
-        const response = await fetch(releaseChannelUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        releases = await response.json();
-    } catch (error) {
-        console.error('Error fetching releases:', error);
-    }
 }
