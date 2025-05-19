@@ -1,9 +1,9 @@
 [
     {
-        "name": "1.2.4-alpha",
-        "download": "https://github.com/Inrixia/TidaLuna/releases/download/1.2.4-alpha/luna.zip",
-        "githubUrl": "https://github.com/Inrixia/TidaLuna/releases/tag/1.2.4-alpha",
-        "version": "1.2.4-alpha",
+        "name": "1.2.6-alpha-hotfix",
+        "download": "https://github.com/Inrixia/TidaLuna/releases/download/1.2.6-alpha-hotfix/luna.zip",
+        "githubUrl": "https://github.com/Inrixia/TidaLuna/releases/tag/1.2.6-alpha-hotfix",
+        "version": "1.2.6-alpha-hotfix",
         "id": "1"
     }
 ]
