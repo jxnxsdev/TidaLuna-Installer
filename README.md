@@ -3,6 +3,9 @@
 
 Installer for the [TidaLuna](https://github.com/Inrixia/TidaLuna) Tidal Mod.
 
+![GitHub Downloads (specific asset, all releases)](https://img.shields.io/github/downloads/jxnxsdev/TidaLuna-Installer/installer-windows.exe)
+
+
 ---
 
 ## 🚀 How to Use
