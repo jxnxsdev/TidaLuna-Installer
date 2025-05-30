@@ -2,9 +2,5 @@
 	"main": "build/index.js",
 	"output": "build/tdlnInstaller.blob",
 	"disableExperimentalSEAWarning": true,
-	"useCodeCache": true,
-	"resources": [
-		"./node_modules/**/*",
-		"./build/**/*"
-	]
+	"useCodeCache": true
 }
