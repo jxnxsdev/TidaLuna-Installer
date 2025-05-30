@@ -1,0 +1,57 @@
+---
+name: "[main] Build & Release"
+
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  Build:
+    name: Build for Windows and Linux
+    strategy:
+      matrix:
+        runs-on: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.runs-on }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js 📥
+        uses: actions/setup-node@v4
+        with:
+          node-version: latest
+          cache: "npm"
+
+      - name: Install dependencies 📥
+        run: npm install
+
+      - name: Build Binaries
+        run: npm run build-${{ matrix.runs-on }}
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.runs-on }}
+          path: ./compiled/
+
+  Release:
+    name: Draft latest release on GitHub
+    needs: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./compiled/
+          merge-multiple: true
+
+      - name: Publish latest draft release on GitHub
+        uses: marvinpinto/action-automatic-releases@latest
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          automatic_release_tag: latest
+          draft: true
+          title: Latest Release
+          files: compiled/*
