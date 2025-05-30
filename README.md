@@ -6,121 +6,101 @@ Installer for the [TidaLuna](https://github.com/Inrixia/TidaLuna) Tidal Mod. Aut
 
 ---
 
-## 🚀 How to Use
+## 🧰 How to Use the Installer
 
-The installer should™ work on both **Windows** and **macOS**.  
-Currently, **precompiled binaries are available for Windows only**.
+The installer should™ work on **Windows**, **Linux**, and **macOS**.
+
+- On **Windows** and **Linux**, precompiled binaries are available on the [Releases page](https://github.com/jxnxsdev/TidaLuna-Installer/releases):
+  - `installer-windows.exe`
+  - `installer-linux`
+- On **macOS**, the installer must currently be run from source.  
+  _(macOS support is untested but should work—contributions welcome!)_
+
+Regardless of platform, usage is the same:
+
+1. **Close Tidal** before installing or uninstalling.
+2. Launch the installer.
+3. A browser window should open. If not, navigate to `http://localhost:3013` manually.
+4. Choose a **release channel**: `Stable`, `Pre-release`, or `Dev`.
+5. (Optional) Use **Advanced Options** to manually configure paths or debug.
+6. Click **Install**, **Reinstall**, or **Uninstall** as needed.
 
 ---
+
+## 🚀 Running the Installer
 
 ### 🪟 Windows
 
-#### 🔧 Installing
-
-1. Download the precompiled binary from the [Releases page](https://github.com/jxnxsdev/TidaLuna-Installer/releases).  
+1. Download `installer-windows.exe` from the [Releases page](https://github.com/jxnxsdev/TidaLuna-Installer/releases)  
    ![Download Release](images/github_compiled_download.png)
 
-2. Run the downloaded `installer-windows.exe`.  
-   You might encounter a Windows SmartScreen warning. Click **"More info"** and then **"Run anyway"**.  
-   A browser window should open automatically. If it doesn't, open `http://localhost:3013` manually.  
-   ![SmartScreen Warning](images/smartscreen.png)  
-   ![SmartScreen More Info](images/smartscreen_more.png)
-
-3. **Close Tidal** before continuing.
-
-4. Select a **release channel**. These include `Stable`, `Pre-release`, and `Dev` versions.  
-   ![Release Channels](images/releases.png)
-
-5. (Optional) Click on **Advanced Options** if you need to configure installation paths or debug issues.  
-   More on that in the [Advanced Options](#advanced-options) section.
-
-6. Click **Install** or **Reinstall** to begin the installation.  
-   ![Install/Reinstall Buttons](images/buttons.png)
+2. Run the `.exe`. You may get a SmartScreen warning:
+   - Click **"More info"**, then **"Run anyway"**  
+     ![SmartScreen Warning](images/smartscreen.png)  
+     ![SmartScreen More Info](images/smartscreen_more.png)
 
 ---
 
-#### ❌ Uninstalling
+### 🐧 Linux
 
-1. Download the precompiled binary from the [Releases page](https://github.com/jxnxsdev/TidaLuna-Installer/releases).  
-   ![Download Release](images/github_compiled_download.png)
+1. Download `installer-linux` from the [Releases page](https://github.com/jxnxsdev/TidaLuna-Installer/releases)
+2. Make it executable:
 
-2. Run the downloaded `installer-windows.exe`.  
-   ![SmartScreen Warning](images/smartscreen.png)  
-   ![SmartScreen More Info](images/smartscreen_more.png)
+   ```bash
+   chmod +x installer-linux
+   ```
 
-3. **Close Tidal**
+3. Run the binary:
 
-4. Click the **Uninstall** button at the bottom of the page.  
-   ![Install/Reinstall Buttons](images/buttons.png)
+   ```bash
+   ./installer-linux
+   ```
 
 ---
 
-### 🍏 macOS
+### 🍏 macOS (from source)
 
-> ⚠️ The installer is **untested on macOS**. It should theoretically work, but has not been verified.  
-> If you're on macOS and willing to test, feel free to contribute!
+> ⚠️ macOS support is currently **untested**.
 
 #### 📦 Requirements
 
 - Node.js v20
-- npm (usually bundled with Node.js)
-- This project cloned or downloaded
+- npm (comes with Node.js)
+- Project cloned or downloaded
 
----
+#### 🛠️ Steps
 
-#### 📁 Downloading the Project
+1. Download the project:
 
-1. Scroll to the top of the [repository page](https://github.com/jxnxsdev/TidaLuna-Installer)
-2. Click the green **Code** button
-3. Select **"Download ZIP"**  
-   ![Download ZIP](images/github_download.png)
+   - Go to the [repository](https://github.com/jxnxsdev/TidaLuna-Installer)
+   - Click **Code** → **Download ZIP**
+     ![Download ZIP](images/github_download.png)
 
----
-
-#### 📥 Installing Dependencies
-
-1. Open a terminal inside the base project folder
-2. Run:
+2. Open a terminal in the project folder and run:
 
    ```bash
    npm install
-   ```
-
----
-
-#### ▶️ Running the App
-
-1. Build the TypeScript code:
-
-   ```bash
    npm run tsc
-   ```
-
-2. Start the app:
-
-   ```bash
    node ./build/index.js
    ```
-
-> After this point, the usage is the same as on Windows.
 
 ---
 
 ## ⚙️ Advanced Options
 
-If the installer cannot locate your Tidal installation, you can manually specify the path.
+If the installer cannot locate your Tidal installation:
 
-1. Locate your **Tidal install directory**
-2. Navigate into the `app-*` folder (e.g., `app-5.12.0`)
-3. Copy the path to the **`resources`** folder inside it  
-   ![Advanced Options](images/advanced_options.png)  
-   ![Tidal Folder](images/tidal_folder.png)  
+1. Manually find your **Tidal install directory**
+2. Navigate into the `app-*` version folder
+3. Copy the path to the `resources` folder
+   ![Advanced Options](images/advanced_options.png)
+   ![Tidal Folder](images/tidal_folder.png)
    ![Tidal Resources Folder](images/tidal_resources.png)
 
-If you’re unfamiliar with versioning formats, check out [semver.org](https://semver.org/) for a quick guide.
+Not sure what version you're looking at? [semver.org](https://semver.org/) explains version formats.
 
 ---
 
 ## 📎 License
 
-MIT — see [LICENSE](./LICENSE) file for details.
+MIT — see [LICENSE](./LICENSE) for details.
