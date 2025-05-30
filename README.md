@@ -10,18 +10,16 @@ Installer for the [TidaLuna](https://github.com/Inrixia/TidaLuna) Tidal Mod. Aut
 
 The installer should™ work on **Windows**, **Linux**, and **macOS**.
 
-- On **Windows** and **Linux**, precompiled binaries are available on the [Releases page](https://github.com/jxnxsdev/TidaLuna-Installer/releases):
+- On **Windows**, **Linux**, and **macOS**, precompiled binaries are available on the [Releases page](https://github.com/jxnxsdev/TidaLuna-Installer/releases):
   - `installer-windows.exe`
   - `installer-linux`
-- On **macOS**, the installer must currently be run from source.  
-  _(macOS support is untested but should work—contributions welcome!)_
-
-Regardless of platform, usage is the same:
+  - `installer-macos`
+- For all platforms, usage is the same:
 
 1. **Close Tidal** before installing or uninstalling.
-2. Launch the installer.
+2. Launch the installer binary.
 3. A browser window should open. If not, navigate to `http://localhost:3013` manually.
-4. Choose a **release channel**
+4. Choose a **release channel**: `Stable`, `Beta`, or `Alpha`.
 5. (Optional) Use **Advanced Options** to manually configure paths or debug.
 6. Click **Install**, **Reinstall**, or **Uninstall** as needed.
 
@@ -58,17 +56,37 @@ Regardless of platform, usage is the same:
 
 ---
 
-### 🍏 macOS (from source)
+### 🍏 macOS
 
-> ⚠️ macOS support is currently **untested**.
+You can now use the precompiled binary `installer-macos` or run from source (untested).
 
-#### 📦 Requirements
+#### Using the `installer-macos` binary
+
+1. Download `installer-macos` from the [Releases page](https://github.com/jxnxsdev/TidaLuna-Installer/releases)
+
+2. Make it executable:
+
+   ```bash
+   chmod +x installer-macos
+   ```
+
+3. Run the binary:
+
+   ```bash
+   ./installer-macos
+   ```
+
+4. A browser window should open automatically. If it doesn't, open `http://localhost:3013` manually.
+
+### 🧑‍💻 Running from source
+
+##### Requirements
 
 - Node.js v20
 - npm (comes with Node.js)
 - Project cloned or downloaded
 
-#### 🛠️ Steps
+##### Steps
 
 1. Download the project:
 
