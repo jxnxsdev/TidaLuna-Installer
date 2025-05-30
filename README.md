@@ -21,7 +21,7 @@ Regardless of platform, usage is the same:
 1. **Close Tidal** before installing or uninstalling.
 2. Launch the installer.
 3. A browser window should open. If not, navigate to `http://localhost:3013` manually.
-4. Choose a **release channel**: `Stable`, `Pre-release`, or `Dev`.
+4. Choose a **release channel**
 5. (Optional) Use **Advanced Options** to manually configure paths or debug.
 6. Click **Install**, **Reinstall**, or **Uninstall** as needed.
 
