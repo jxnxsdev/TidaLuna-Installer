@@ -19,6 +19,12 @@ export async function execute(options: Options): Promise<boolean> {
             msg.stepLog(Steps.KILLING_TIDAL, 'Tidal process killed successfully');
             return true;
         });
+    } else if (os === 'linux') {
+        exec('pkill -f tidal-hifi', (error, stdout, stderr) => {
+            msg.stepLog(Steps.KILLING_TIDAL, stdout)
+            msg.stepLog(Steps.KILLING_TIDAL, 'Tidal process killed successfully');
+            return true;
+        });
     } else {
         msg.stepError(Steps.KILLING_TIDAL, 'Unsupported Operating System', new Error('Unsupported OS'));
         return false;
