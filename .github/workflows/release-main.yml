@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   Build:
-    name: Build for Windows, Linux, and Mac
+    name: Build for Windows , Linux and Mac
     strategy:
       matrix:
         runs-on: [ubuntu-latest, windows-latest, macos-latest]
@@ -19,46 +19,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install Node.js normally on macOS & Windows
       - name: Install Node.js 📥
-        if: ${{ !contains(matrix.runs-on, 'ubuntu') }}
         uses: actions/setup-node@v4
         with:
           node-version: 20.15.1
           cache: "npm"
 
-      # Install full unstripped Node.js on Linux
-      - name: Install unstripped Node.js on Linux 🐧
-        if: contains(matrix.runs-on, 'ubuntu')
-        run: |
-          curl -fsSL https://nodejs.org/dist/v20.15.1/node-v20.15.1-linux-x64.tar.xz -o node.tar.xz
-          tar -xf node.tar.xz
-          echo "$PWD/node-v20.15.1-linux-x64/bin" >> $GITHUB_PATH
-          echo "Using custom Node path: $(which node)"
-          node -v
+      - name: Install dependencies 📥
+        run: npm install
 
-      - name: Install dependencies 📦
-        run: npm ci
+      - name: Build Binaries
+        run: npm run build-${{ matrix.runs-on }}
 
-      - name: Build Binaries 🔨
-        shell: bash
-        run: |
-          if [[ "${{ matrix.runs-on }}" == "ubuntu-latest" ]]; then
-            npm run build-ubuntu-latest
-          elif [[ "${{ matrix.runs-on }}" == "windows-latest" ]]; then
-            npm run build-windows-latest
-          elif [[ "${{ matrix.runs-on }}" == "macos-latest" ]]; then
-            npm run build-macos-latest
-          fi
-
-      - name: Upload Build Artifact 📤
+      - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: build-${{ matrix.runs-on }}
           path: ./compiled/
 
   Release:
-    name: Create Release with Auto-Version 🚀
+    name: Create Release with Auto-Version
     needs: Build
     runs-on: ubuntu-latest
 

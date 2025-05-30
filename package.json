@@ -10,11 +10,11 @@
     "bundle": "npm run tsc && esbuild ./src/**/*.ts --bundle --platform=node --outdir=./build/",
     "makeBlob": "node --experimental-sea-config ./sea-config.json",
     "injectWin": "npx postject ./compiled/installer-windows.exe NODE_SEA_BLOB ./build/tdlnInstaller.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2",
-    "build-windows-latest": "node make.js ./compiled/installer-windows.exe && npm run bundle && npm run makeBlob && npm run injectWin",
+    "build-windows-latest": "node make.js ./compiled/installer-windows.exe windows && npm run bundle && npm run makeBlob && npm run injectWin",
     "injectLinux": "npx postject ./compiled/installer-linux NODE_SEA_BLOB ./build/tdlnInstaller.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2",
-    "build-ubuntu-latest": "node make.js ./compiled/installer-linux && npm run bundle && npm run makeBlob && npm run injectLinux",
+    "build-ubuntu-latest": "node make.js ./compiled/installer-linux linux && npm run bundle && npm run makeBlob && npm run injectLinux",
     "injectMac": "npx postject ./compiled/installer-macos NODE_SEA_BLOB ./build/tdlnInstaller.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2",
-    "build-macos-latest": "node make.js ./compiled/installer-macos && npm run bundle && npm run makeBlob && npm run injectMac"
+    "build-macos-latest": "node make.js ./compiled/installer-macos macos && npm run bundle && npm run makeBlob && npm run injectMac"
   },
   "repository": {
     "type": "git",
