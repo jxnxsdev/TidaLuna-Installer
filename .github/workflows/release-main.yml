@@ -1,10 +1,12 @@
----
 name: "[main] Build & Release"
 
 on:
   push:
     branches:
       - "main"
+
+permissions:
+  contents: write
 
 jobs:
   Build:
@@ -36,7 +38,7 @@ jobs:
           path: ./compiled/
 
   Release:
-    name: Draft latest release on GitHub
+    name: Create Release with Auto-Version
     needs: Build
     runs-on: ubuntu-latest
 
@@ -47,11 +49,33 @@ jobs:
           path: ./compiled/
           merge-multiple: true
 
-      - name: Publish latest draft release on GitHub
-        uses: marvinpinto/action-automatic-releases@latest
+      - name: Set up GitHub CLI
+        uses: cli/cli-action@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          automatic_release_tag: latest
-          draft: true
-          title: Latest Release
-          files: compiled/*
+          version: latest
+
+      - name: Get latest version tag
+        id: get_tag
+        run: |
+          latest_tag=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' || echo "v0.0.0")
+          echo "Latest tag: $latest_tag"
+
+          version=${latest_tag#v}
+          IFS='.' read -r major minor patch <<< "$version"
+          patch=$((patch + 1))
+          new_version="v$major.$minor.$patch"
+
+          echo "New version: $new_version"
+          echo "new_tag=$new_version" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "${{ steps.get_tag.outputs.new_tag }}" \
+            --title "Release ${{ steps.get_tag.outputs.new_tag }}" \
+            --generate-notes \
+            --latest \
+            ./compiled/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
