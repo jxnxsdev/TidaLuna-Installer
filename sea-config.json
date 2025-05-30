@@ -1,6 +1,6 @@
 {
-	"main": "build/index.js",
-	"output": "build/tdlnInstaller.blob",
+	"main": "es_build/index.js",
+	"output": "es_build/tdlnInstaller.blob",
 	"disableExperimentalSEAWarning": true,
 	"useCodeCache": true
 }
