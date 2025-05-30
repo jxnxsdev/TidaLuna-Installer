@@ -9,7 +9,7 @@ const isLinux = process.argv[3] === "linux";
 if (binPath === undefined) throw new Error("No bin path provided");
 
 if (isLinux) {
-    const downloadUrl = "https://nodejs.org/dist/v20.15.1/node-v20.15.1-linux-x64.tar.xz";
+    const downloadUrl = "https://nodejs.org/download/release/v22.15.0/node-v22.15.0-linux-x64.tar.xz";
     const tarFile = "./node.tar.xz";
     execSync(`curl -L ${downloadUrl} -o ${tarFile}`);
 
