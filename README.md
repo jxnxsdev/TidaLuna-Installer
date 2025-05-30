@@ -1,10 +1,8 @@
-
 # TidaLuna Installer
 
-Installer for the [TidaLuna](https://github.com/Inrixia/TidaLuna) Tidal Mod.
+Installer for the [TidaLuna](https://github.com/Inrixia/TidaLuna) Tidal Mod. Automatically uninstalls Neptune if it's installed.
 
 ![GitHub Downloads (specific asset, all releases)](https://img.shields.io/github/downloads/jxnxsdev/TidaLuna-Installer/installer-windows.exe)
-
 
 ---
 
