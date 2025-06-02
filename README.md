@@ -3,15 +3,28 @@
 
 Installer for the [TidaLuna](https://github.com/Inrixia/TidaLuna) Tidal Mod.
 
----
+## 📥 Downloads
 
 ## 🚀 How to Use
 
 The installer should™ work on both **Windows** and **macOS**.  
 Currently, **precompiled binaries are available for Windows only**.
+=======
+Precompiled builds are available on the [Releases page](https://github.com/jxnxsdev/TidaLuna-Installer/releases).  
+Choose the file matching your OS and architecture.
 
----
+## 📚 Documentation
 
+Looking for setup guides or help?
+
+Check out the [Wiki](https://github.com/jxnxsdev/TidaLuna-Installer/wiki) for:
+
+- [Quick Start](https://github.com/jxnxsdev/TidaLuna-Installer/wiki/Quick-Start)
+- [Windows Installation Guide](https://github.com/jxnxsdev/TidaLuna-Installer/wiki/Windows-Guide)
+- [macOS Installation Guide](https://github.com/jxnxsdev/TidaLuna-Installer/wiki/macOS-Guide)
+- [Linux Installation Guide](https://github.com/jxnxsdev/TidaLuna-Installer/wiki/Linux-Guide)
+
+<<<<<<< Updated upstream
 ### 🪟 Windows
 
 #### 🔧 Installing
@@ -119,6 +132,11 @@ If the installer cannot locate your Tidal installation, you can manually specify
 If you’re unfamiliar with versioning formats, check out [semver.org](https://semver.org/) for a quick guide.
 
 ---
+=======
+## 💬 Need Help?
+
+Join the community Discord for support:  
+[discord.gg/jK3uHrJGx4](https://discord.gg/jK3uHrJGx4)
 
 ## 📎 License
 
