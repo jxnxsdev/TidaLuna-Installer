@@ -1,0 +1,112 @@
+name: "[main] Build & Release"
+
+on:
+ push:
+  branches:
+   - "main"
+
+permissions:
+ contents: write
+
+jobs:
+ Build:
+  name: Build ${{ matrix.platform.os-name }}
+  runs-on: ${{ matrix.platform.runs-on }}
+  strategy:
+   matrix:
+    platform:
+     - os-name: linux-x86_64
+       runs-on: ubuntu-latest
+
+     - os-name: windows-x86_64
+       runs-on: windows-latest
+
+     - os-name: macOS-x86_64
+       runs-on: macOS-13
+
+     - os-name: macOS-aarch64
+       runs-on: macOS-latest
+
+  steps:
+   - uses: actions/checkout@v4
+
+   - name: Install pnpm 📥
+     uses: pnpm/action-setup@v4
+     with:
+      version: latest
+
+   - name: Install Node.js 📥
+     uses: actions/setup-node@v4
+     with:
+      cache: pnpm
+      node-version: latest
+
+   - name: Install dependencies 📥
+     run: pnpm install
+
+   - name: Build
+     run: pnpm run make
+
+   - name: Make artifacts output dir
+     run: mkdir ./artifacts
+
+   - name: Archive binary
+     run: tar -czf ./artifacts/${{ matrix.platform.os-name }}.tar.gz -C ./build luna-installer
+     if: matrix.platform.runs-on != 'windows-latest'
+
+   - name: Archive binary (windows)
+     run: powershell -Command "Compress-Archive -Path './build/luna-installer.exe' -DestinationPath './artifacts/${{ matrix.platform.os-name }}.zip'"
+     if: matrix.platform.runs-on == 'windows-latest'
+
+   - name: Upload Build Artifact
+     uses: actions/upload-artifact@v4
+     with:
+      name: ${{ matrix.platform.runs-on }}
+      path: ./artifacts/
+
+ Release:
+  name: Create Release with Auto-Version
+  needs: Build
+  runs-on: ubuntu-latest
+
+  steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Download All Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./build/
+        merge-multiple: true
+
+    - name: Install GitHub CLI (gh)
+      run: |
+        sudo apt update
+        sudo apt install -y gh
+
+    - name: Authenticate GitHub CLI
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+    - name: Get latest version tag and compute new version
+      id: get_tag
+      run: |
+        latest_tag=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' || echo "v0.0.0")
+        echo "Latest tag: $latest_tag"
+
+        version=${latest_tag#v}
+        IFS='.' read -r major minor patch <<< "$version"
+        patch=$((patch + 1))
+        new_version="v$major.$minor.$patch"
+
+        echo "New version: $new_version"
+        echo "new_tag=$new_version" >> "$GITHUB_OUTPUT"
+
+    - name: Create GitHub Release
+      run: |
+       gh release create "${{ steps.get_tag.outputs.new_tag }}" \
+          --title "Release ${{ steps.get_tag.outputs.new_tag }}" \
+          --generate-notes \
+          --latest \
+          ./build/*
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

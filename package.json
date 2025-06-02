@@ -5,12 +5,8 @@
   "main": "build/index.js",
   "scripts": {
     "build:ts": "tsc",
-    "bundle:public": "node bundle-public.js",
     "tsc": "tsc --incremental",
-    "bundle": "npm run tsc && esbuild ./src/* --bundle --platform=node --outdir=./build/",
-    "makeBlob": "node --experimental-sea-config ./sea-config.json",
-    "injectWin": "npx postject ./compiled/tdln-win.exe NODE_SEA_BLOB ./build/tdlnInstaller.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2",
-    "build-windows-latest": "node make.js ./compiled/tdln-win.exe && npm run bundle && npm run makeBlob && npm run injectWin"
+    "make": "node ./make.js"
   },
   "repository": {
     "type": "git",
@@ -25,6 +21,7 @@
   "devDependencies": {
     "@types/semver": "^7.7.0",
     "@types/ws": "^8.18.1",
+    "esbuild": "^0.25.5",
     "postject": "^1.0.0-alpha.6",
     "typescript": "^5.8.3"
   },
