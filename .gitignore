@@ -3,3 +3,4 @@ build/
 compiled/
 es_build/
 tsconfig.tsbuildinfo
+dist/

@@ -1,23 +1,26 @@
-const { mkdirSync, copyFileSync, readFileSync, writeFileSync } = require("fs");
-const { execSync } = require("child_process");
+import { execSync } from "child_process";
+import { copyFileSync, mkdirSync, rmSync } from "fs";
+import { platform } from "os";
+
+const run = (cmd) => execSync(cmd, { stdio: "inherit" });
+
+const binPath = platform() === "win32" ? ".\\build\\luna-installer.exe" : "./build/luna-installer";
+
+// Clean build directory
+rmSync("./build", { recursive: true, force: true });
+rmSync("./dist", { recursive: true, force: true });
+
+// Bundle the code
+run("npx esbuild ./src/index.ts --bundle --minify --tree-shaking=true --platform=node --outfile=./dist/luna-installer.cjs");
+
+// Copy node binary
 mkdirSync("./build", { recursive: true });
-mkdirSync("./compiled", { recursive: true });
-const binPath = process.argv[2];
-const isLinux = process.argv[3] === "linux";
+copyFileSync(process.execPath, binPath);
 
+// Create the blob
+run("node --experimental-sea-config ./sea-config.json");
 
-if (binPath === undefined) throw new Error("No bin path provided");
-
-if (isLinux) {
-    const downloadUrl = "https://nodejs.org/download/release/v22.15.0/node-v22.15.0-linux-x64.tar.xz";
-    const tarFile = "./node.tar.xz";
-    execSync(`curl -L ${downloadUrl} -o ${tarFile}`);
-
-    mkdirSync("./node", { recursive: true });
-
-    execSync(`tar -xf ${tarFile} --strip-components=1 -C ./node`);
-    execSync(`rm ${tarFile}`);
-    copyFileSync("./node/bin/node", binPath);
-} else {
-    copyFileSync(process.execPath, binPath);
-}
+// Inject the blob
+run(
+	`npx postject ${binPath} NODE_SEA_BLOB ./dist/luna-installer.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 --macho-segment-name NODE_SEA`
+);
