@@ -12,6 +12,7 @@ import * as CopyAsarInstallStep from './Steps/CopyingAsarInstall';
 import * as InsertLunaStep from './Steps/InsertingLuna';
 import * as UninstallStep from './Steps/Uninstalling';
 import * as CopyAsarUninstallStep from './Steps/CopyingAsarUninstall';
+import * as SignTidalStep from './Steps/SignTidal';
 
 let currentStep: Steps | undefined;
 let steps: Steps[] = [];
@@ -54,7 +55,8 @@ export async function generateInstallSteps(): Promise<void> {
                 Steps.DOWNLOADING_LUNA,
                 Steps.EXTRACTING_LUNA,
                 Steps.COPYING_ASAR_INSTALL,
-                Steps.INSERTING_LUNA
+                Steps.INSERTING_LUNA,
+                Steps.SIGNING_TIDAL
             ];
             break;
         case 'uninstall':
@@ -126,6 +128,7 @@ async function executeCurrentStep(): Promise<void> {
         [Steps.INSERTING_LUNA]: InsertLunaStep,
         [Steps.UNINSTALLING]: UninstallStep,
         [Steps.COPYING_ASAR_UNINSTALL]: CopyAsarUninstallStep,
+        [Steps.SIGNING_TIDAL]: SignTidalStep
     };
 
     try {
