@@ -12,13 +12,7 @@ Choose the file matching your OS and architecture.
 ## 📚 Documentation
 
 Looking for setup guides or help?
-
-Check out the [Wiki](https://github.com/jxnxsdev/TidaLuna-Installer/wiki) for:
-
-- [Quick Start](https://github.com/jxnxsdev/TidaLuna-Installer/wiki/Quick-Start)
-- [Windows Installation Guide](https://github.com/jxnxsdev/TidaLuna-Installer/wiki/Windows-Guide)
-- [macOS Installation Guide](https://github.com/jxnxsdev/TidaLuna-Installer/wiki/macOS-Guide)
-- [Linux Installation Guide](https://github.com/jxnxsdev/TidaLuna-Installer/wiki/Linux-Guide)
+Check out the [Wiki](https://luna-wiki.jxnxsdev.me/getting-started.html)
 
 ## 💬 Need Help?
 
