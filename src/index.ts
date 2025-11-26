@@ -6,7 +6,7 @@ const WebSocket = require('ws');
 import { createServer } from 'http';
 import { Buffer } from 'buffer';
 import path from 'path';
-import Sentry from '@sentry/node';
+import * as Sentry from '@sentry/node';
 
 // Local imports
 import { openUrl } from './utils/BrowserHelper';
