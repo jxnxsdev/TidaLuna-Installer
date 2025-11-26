@@ -1,15 +1,19 @@
+import './Logging/Sentry';
+
 // Library imports
 import express from 'express';
 const WebSocket = require('ws');
 import { createServer } from 'http';
 import { Buffer } from 'buffer';
 import path from 'path';
+import Sentry from '@sentry/node';
 
 // Local imports
 import { openUrl } from './utils/BrowserHelper';
 import * as manager from './InstallManager';
 import { isLunaInstalled } from './utils/PathHelper';
 import { loadReleases } from './utils/ReleaseLoader';
+import { initializeSentry } from './Logging/Sentry';
 
 // Type & Enum imports
 import { WebsocketMessageTypes } from './enums/WebsocketMessageTypes';
@@ -30,10 +34,12 @@ let options: Options = {
     action: undefined,
 }
 
-server.listen(3013, () => {
+server.listen(3013, async () => {
+    await initializeSentry();
     console.log('TidaLuna Installer is running on port 3013! Open http://localhost:3013 in your browser!');
     openUrl('http://localhost:3013').catch((err) => {
         console.error('Failed to open URL:', err);
+        Sentry.captureException(err);
     });
 });
 

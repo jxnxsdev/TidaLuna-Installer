@@ -26,6 +26,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@sentry/node": "^10.27.0",
     "@types/adm-zip": "^0.5.7",
     "@types/express": "^5.0.1",
     "adm-zip": "^0.5.16",
