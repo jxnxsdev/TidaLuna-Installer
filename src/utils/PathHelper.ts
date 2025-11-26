@@ -38,3 +38,20 @@ export async function isLunaInstalled(): Promise<boolean> {
     const appDir = path.join(tidalPath, "app");
     return await fs.existsSync(appDir);
 }
+
+/*
+* Get the application data path for TidaLunaInstaller based on the OS
+* @returns {Promise<string>} The application data path
+*/
+export async function getAppdataPath(): Promise<string> {
+    switch (os.platform()) {
+        case "win32":
+            return path.join(process.env.APPDATA, "TidaLunaInstaller");
+        case "darwin":
+            return path.join(os.homedir(), "Library", "Application Support", "TidaLunaInstaller");
+        case "linux":
+            return path.join(os.homedir(), ".config", "TidaLunaInstaller");
+        default:
+            return "";
+    }
+}
