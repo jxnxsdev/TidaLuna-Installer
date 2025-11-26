@@ -24,7 +24,7 @@ export async function execute(options: Options): Promise<boolean> {
     }
 
     try {
-        fs.rmdirSync(dir, { recursive: true });
+        fs.rmSync(dir, { recursive: true, force: true });
         msg.stepLog(Steps.UNINSTALLING, 'TidaLuna / Neptune uninstalled successfully');
     } catch (error) {
         msg.stepError(Steps.UNINSTALLING, 'Error uninstalling TidaLuna / Neptune', error as Error);
