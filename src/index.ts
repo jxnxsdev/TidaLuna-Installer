@@ -60,6 +60,8 @@ app.use((req:express.Request, res:express.Response, next:express.NextFunction) =
     res.type(mime).send(data);
 })
 
+// State endpoint
+// Returns the current state of the installation process
 app.get('/state', async (req:express.Request, res:express.Response) => {
     let isRunning = await manager.getIsRunning();
     let options = await manager.getOptions();
@@ -76,17 +78,23 @@ app.get('/state', async (req:express.Request, res:express.Response) => {
     });
 });
 
+// Releases endpoint
+// Returns the available releases for installation
 app.get('/releases', async (req:express.Request, res:express.Response) => {
     const releases: Release[] = await loadReleases();
     res.json(releases);
 });
 
+// Start installation endpoint
+// Starts the installation process
 app.get('/start', async (req:express.Request, res:express.Response) => {
     res.status(200).send('Installation started!');
     await manager.generateInstallSteps();
     await manager.start();
 });
 
+// Set options endpoint
+// Sets the options for the installation process
 app.get('/setOptions', async (req:express.Request, res:express.Response) => {
     if (!req.query || !req.query.action) {
         res.status(400).send('No options provided!');
@@ -115,6 +123,8 @@ app.get('/setOptions', async (req:express.Request, res:express.Response) => {
     res.status(200).json(options);
 });
 
+// Is installed endpoint
+// Returns whether TidaLuna is installed
 app.get('/isInstalled', async (req:express.Request, res:express.Response) => {
     const isInstalled = await isLunaInstalled();
     res.json({ isInstalled: isInstalled });

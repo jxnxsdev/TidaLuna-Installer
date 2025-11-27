@@ -37,7 +37,7 @@ export async function initializeSentry(): Promise<void> {
  *
  * @returns {Promise<string | null>} A stable UUID or null if something failed.
  */
-async function getOrCreateSentryUser(): Promise<string | null> {
+export async function getOrCreateSentryUser(): Promise<string | null> {
   try {
     const appDataPath = await getAppdataPath();
     const userFilePath = path.join(appDataPath, "sentry_user_id.txt");
