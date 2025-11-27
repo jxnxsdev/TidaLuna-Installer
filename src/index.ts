@@ -34,10 +34,13 @@ let options: Options = {
     action: undefined,
 }
 
-server.listen(3013, async () => {
+server.listen(0, async () => {
     await initializeSentry();
-    console.log('TidaLuna Installer is running on port 3013! Open http://localhost:3013 in your browser!');
-    openUrl('http://localhost:3013').catch((err) => {
+
+    let port = (server.address() as any).port;
+
+    console.log(`TidaLuna Installer is running on port ${port}! Open http://localhost:${port} in your browser!`);
+    openUrl(`http://localhost:${port}`).catch((err) => {
         console.error('Failed to open URL:', err);
         Sentry.captureException(err);
     });
