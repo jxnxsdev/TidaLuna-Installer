@@ -15,13 +15,16 @@
         <div class="app-container">
             <header>
                 <h1>TidaLuna Installer</h1>
-                <div class="theme-toggle">
-                    <span class="theme-icon light">☀️</span>
-                    <span class="theme-icon dark">🌙</span>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <button id="help-btn" class="help-button" aria-label="Show help">?</button>
+                    <div class="theme-toggle">
+                        <span class="theme-icon light">☀️</span>
+                        <span class="theme-icon dark">🌙</span>
+                        <span class="theme-icon spectrum">🌈</span>
+                    </div>
                 </div>
             </header>
 
-            <!-- Setup Screen -->
             <div id="setup-screen" class="screen active">
                 <div class="card">
                     <h2>Global Log</h2>
@@ -31,7 +34,6 @@
                 <div class="card">
                     <h2>Release Channel</h2>
                     <div id="release-cards" class="release-cards-container">
-                        <!-- Release cards will be populated dynamically -->
                         <div class="release-card loading">
                             <div class="release-card-header">
                                 <h3>Loading...</h3>
@@ -66,7 +68,6 @@
                 </div>
             </div>
 
-            <!-- Progress Screen -->
             <div id="progress-screen" class="screen">
                 <div class="card">
                     <h2>Global Log</h2>
@@ -76,7 +77,6 @@
                 <div class="card">
                     <h2>Installation Progress</h2>
                     <div id="steps-container" class="steps-container">
-                        <!-- Steps will be added dynamically -->
                     </div>
                 </div>
 
@@ -104,7 +104,7 @@
         <canvas id="particles"></canvas>
     </div>
 
-    <script src="script.js"></script>
+    <script type="module" src="main.js"></script>
 </body>
 
 </html>
