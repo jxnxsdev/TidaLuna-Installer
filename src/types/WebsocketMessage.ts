@@ -2,6 +2,7 @@ import { WebsocketMessageTypes } from "../enums/WebsocketMessageTypes"
 import { StepLog } from "./StepLog";
 import { InstallLog } from "./InstallLog";
 import { InstallInfo } from "./InstallInfo";
+import { Popup } from "./Popup";
 
 /**
 * @description This type is used to log the installation process of the app.
@@ -10,5 +11,5 @@ import { InstallInfo } from "./InstallInfo";
 */
 export type WebsocketMessage = {
     type: WebsocketMessageTypes;
-    data: StepLog | InstallLog | InstallInfo | string;
+    data: StepLog | InstallLog | InstallInfo | Popup | string;
 }

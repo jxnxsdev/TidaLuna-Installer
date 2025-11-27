@@ -3,6 +3,7 @@ import { WebsocketMessageTypes } from './enums/WebsocketMessageTypes';
 import { Options } from './types/Options';
 import { sendMessageToFrontend } from '.';
 import * as msg from './utils/MessageHelper';
+import { sendErrorHelpPopup } from './utils/PopupHelper';
 
 import * as SetupStep from './Steps/Setup';
 import * as KillTidalStep from './Steps/KillTidal';
@@ -137,6 +138,7 @@ async function executeCurrentStep(): Promise<void> {
         if (!result) {
             msg.installError(`${step} step failed.`);
             isRunning = false;
+            await sendErrorHelpPopup();
             return;
         }
 

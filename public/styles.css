@@ -27,6 +27,25 @@
     --shadow-color: rgba(0, 0, 0, 0.2);
 }
 
+.spectrum-theme {
+    --primary-color: #818cf8;
+    --primary-hover: #6366f1;
+    --secondary-color: #94a3b8;
+    --secondary-hover: #cbd5e1;
+    --card-bg: #1e293b;
+    --text-color: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --border-color: #334155;
+    --shadow-color: rgba(0, 0, 0, 0.2);
+}
+
+body.spectrum-theme {
+    --background-color: transparent;
+
+    animation: spectrum-gradient 20s infinite;
+    background-color: #0f172a;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -124,11 +143,31 @@ h3 {
     display: none;
 }
 
+.theme-icon.spectrum {
+    display: none;
+}
+
 .dark-theme .theme-icon.light {
     display: none;
 }
 
 .dark-theme .theme-icon.dark {
+    display: block;
+}
+
+.dark-theme .theme-icon.spectrum {
+    display: none;
+}
+
+.spectrum-theme .theme-icon.light {
+    display: none;
+}
+
+.spectrum-theme .theme-icon.dark {
+    display: none;
+}
+
+.spectrum-theme .theme-icon.spectrum {
     display: block;
 }
 
@@ -176,7 +215,6 @@ h3 {
     position: relative;
 }
 
-/* Fix dropdown styling for light and dark mode */
 select {
     width: 100%;
     padding: 0.75rem 1rem;
@@ -190,7 +228,6 @@ select {
     transition: border-color var(--transition-speed);
 }
 
-/* Remove white border around context menu */
 select option {
     background-color: var(--card-bg);
     color: var(--text-color);
@@ -377,7 +414,6 @@ input[type="text"]:focus {
     color: var(--error-color);
 }
 
-/* Add styles for release cards */
 .release-cards-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -385,14 +421,12 @@ input[type="text"]:focus {
     margin-top: 1rem;
 }
 
-/* Add wrapper for card and GitHub container */
 .release-card-wrapper {
     display: flex;
     flex-direction: column;
     margin-bottom: 1rem;
 }
 
-/* Update card styling to be less bright */
 .release-card {
     background-color: var(--card-bg);
     border: 1px solid var(--border-color);
@@ -413,14 +447,12 @@ input[type="text"]:focus {
 .release-card.selected {
     border-color: var(--primary-color);
     background-color: rgba(99, 102, 241, 0.1);
-    /* More subtle background */
     color: var(--text-color);
     border-radius: 0.75rem 0.75rem 0 0;
 }
 
 .dark-theme .release-card.selected {
     background-color: rgba(129, 140, 248, 0.2);
-    /* More subtle background for dark mode */
 }
 
 .release-card-header {
@@ -430,7 +462,6 @@ input[type="text"]:focus {
     margin-bottom: 0.75rem;
 }
 
-/* Improve dropdown styling */
 .custom-select-container {
     position: relative;
     width: 100%;
@@ -439,7 +470,6 @@ input[type="text"]:focus {
 .version-select {
     width: 100%;
     padding: 0.5rem 2rem 0.5rem 0.75rem;
-    /* Add padding for the arrow */
     border-radius: 0.5rem;
     border: 1px solid var(--border-color);
     background-color: var(--card-bg);
@@ -448,12 +478,10 @@ input[type="text"]:focus {
     cursor: pointer;
     transition: border-color var(--transition-speed);
     appearance: none;
-    /* Remove default arrow */
     -webkit-appearance: none;
     -moz-appearance: none;
 }
 
-/* Add dropdown arrow */
 .dropdown-arrow {
     position: absolute;
     right: 0.75rem;
@@ -468,29 +496,12 @@ input[type="text"]:focus {
     color: var(--text-color);
 }
 
-/* Fix dropdown styling for dark mode */
 .release-card.selected .version-select {
     border-color: var(--border-color);
     background-color: var(--card-bg);
     color: var(--text-color);
 }
 
-/* Fix dropdown menu styling for all themes */
-select option {
-    background-color: var(--card-bg) !important;
-    color: var(--text-color) !important;
-    border: none !important;
-    outline: none !important;
-}
-
-/* Fix dropdown styling for light mode */
-.version-select option {
-    background-color: var(--card-bg);
-    color: var(--text-color);
-    border: none;
-}
-
-/* Add select button styling */
 .select-button {
     width: 100%;
     padding: 0.5rem;
@@ -554,14 +565,12 @@ select option {
     height: 16px;
 }
 
-/* GitHub container styling - make it smaller */
 .github-container {
     background-color: var(--card-bg);
     border: 1px solid var(--border-color);
     border-top: none;
     border-radius: 0 0 0.75rem 0.75rem;
     padding: 0.5rem;
-    /* Smaller padding */
     margin-top: -1px;
     text-align: center;
     animation: fadeIn 0.3s ease;
@@ -577,7 +586,6 @@ footer {
     text-align: center;
 }
 
-/* Make GitHub link smaller */
 .github-link {
     display: inline-flex;
     align-items: center;
@@ -587,13 +595,11 @@ footer {
     text-decoration: none;
     transition: all var(--transition-speed);
     padding: 0.35rem 0.75rem;
-    /* Smaller padding */
     border-radius: 0.5rem;
     background-color: var(--background-color);
     width: 100%;
     font-weight: 500;
     font-size: 0.8rem;
-    /* Smaller font */
 }
 
 .github-link:hover {
@@ -603,9 +609,32 @@ footer {
 
 .github-icon {
     width: 14px;
-    /* Smaller icon */
     height: 14px;
-    /* Smaller icon */
+}
+
+.help-button {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--background-color);
+    border: none;
+    font-size: 1.2rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-speed);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-color);
+}
+
+.help-button:hover {
+    background-color: var(--border-color);
+    transform: scale(1.05);
+}
+
+.help-button:active {
+    transform: scale(0.95);
 }
 
 @keyframes fadeIn {
@@ -652,7 +681,6 @@ footer {
     }
 }
 
-/* Add styles for the completion message */
 .completion-message {
     margin-top: 1.5rem;
     padding: 1rem;
@@ -665,7 +693,6 @@ footer {
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
-/* Make sure disabled buttons have proper styling */
 .btn.disabled,
 .btn:disabled {
     opacity: 0.6 !important;
@@ -673,7 +700,6 @@ footer {
     pointer-events: none;
 }
 
-/* Add animation for new steps */
 .step {
     animation: slideIn 0.5s ease;
 }
@@ -687,5 +713,271 @@ footer {
     to {
         opacity: 1;
         transform: translateX(0);
+    }
+}
+
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.popup-overlay.show {
+    opacity: 1;
+}
+
+.popup {
+    background-color: var(--card-bg);
+    border-radius: 0.75rem;
+    box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
+    max-width: 500px;
+    width: 90%;
+    overflow: hidden;
+    transform: scale(0.95);
+    transition: transform 0.3s ease;
+}
+
+.popup-overlay.show .popup {
+    transform: scale(1);
+}
+
+.popup-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+}
+
+.popup-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    flex: 1;
+}
+
+.popup-close-btn {
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: color var(--transition-speed);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+}
+
+.popup-close-btn:hover {
+    color: var(--text-color);
+    background-color: var(--border-color);
+}
+
+.popup-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.popup-icon-info {
+    color: #3b82f6;
+}
+
+.popup-icon-warning {
+    color: #f59e0b;
+}
+
+.popup-icon-error {
+    color: var(--error-color);
+}
+
+.popup-icon-success {
+    color: var(--success-color);
+}
+
+.popup-content {
+    padding: 1.5rem;
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.popup-content h1,
+.popup-content h2,
+.popup-content h3,
+.popup-content h4,
+.popup-content h5,
+.popup-content h6 {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.popup-content h1:first-child,
+.popup-content h2:first-child,
+.popup-content h3:first-child,
+.popup-content h4:first-child,
+.popup-content h5:first-child,
+.popup-content h6:first-child {
+    margin-top: 0;
+}
+
+.popup-content p {
+    margin-bottom: 0.75rem;
+}
+
+.popup-content p:last-child {
+    margin-bottom: 0;
+}
+
+.popup-content em {
+    font-style: italic;
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.popup-content strong {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.popup-footer {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--background-color);
+    flex-wrap: wrap;
+}
+
+.popup-btn {
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.5rem;
+    border: none;
+    font-weight: 500;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all var(--transition-speed);
+    flex: 1;
+    min-width: 120px;
+}
+
+.popup-btn:hover {
+    transform: translateY(-1px);
+}
+
+.popup-btn-default {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+.popup-btn-default:hover {
+    background-color: var(--secondary-hover);
+}
+
+.popup-btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.popup-btn-primary:hover {
+    background-color: var(--primary-hover);
+}
+
+.popup-btn-danger {
+    background-color: var(--error-color);
+    color: white;
+}
+
+.popup-btn-danger:hover {
+    background-color: #dc2626;
+}
+
+.popup-info .popup-header {
+    background-color: rgba(59, 130, 246, 0.05);
+}
+
+.popup-warning .popup-header {
+    background-color: rgba(245, 158, 11, 0.05);
+}
+
+.popup-error .popup-header {
+    background-color: rgba(239, 68, 68, 0.05);
+}
+
+.popup-success .popup-header {
+    background-color: rgba(16, 185, 129, 0.05);
+}
+
+@media (max-width: 480px) {
+    .popup {
+        width: 95%;
+    }
+
+    .popup-btn {
+        min-width: 100px;
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+    }
+
+    .popup-footer {
+        flex-direction: column;
+    }
+
+    .popup-btn {
+        flex: 1;
+    }
+}
+
+@keyframes spectrum-gradient {
+    0% {
+        background-color: #1a1f36;
+    }
+
+    12% {
+        background-color: #2a2150;
+    }
+
+    25% {
+        background-color: #4b2e75;
+    }
+
+    37% {
+        background-color: #6b3a6b;
+    }
+
+    50% {
+        background-color: #7a5543;
+    }
+
+    62% {
+        background-color: #6b6b3a;
+    }
+
+    75% {
+        background-color: #3a6b4b;
+    }
+
+    87% {
+        background-color: #3a5075;
+    }
+
+    100% {
+        background-color: #2a2150;
     }
 }

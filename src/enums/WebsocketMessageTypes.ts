@@ -5,4 +5,5 @@ export enum WebsocketMessageTypes {
     INSTALLATION_COMPLETE = 'installation_complete', // Message indicating the installation is complete
     INSTALLATION_START = 'installation_start', // Message indicating the installation has started
     INSTALLATION_ERROR = 'installation_error', // Message indicating an error occurred during installation
+    POPUP_MESSAGE = 'popup_message' // Message to show a popup to the user
 }
