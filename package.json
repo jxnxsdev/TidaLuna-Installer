@@ -29,7 +29,7 @@
     "@types/adm-zip": "^0.5.7",
     "@types/express": "^5.0.1",
     "adm-zip": "^0.5.16",
-    "express": "^5.1.0",
+    "express": "^5.2.0",
     "semver": "^7.7.2",
     "uuid": "^11.1.0",
     "ws": "^8.18.1"
