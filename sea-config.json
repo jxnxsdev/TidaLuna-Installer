@@ -1,6 +1,0 @@
-{
-	"main": "dist/luna-installer.cjs",
-	"output": "dist/luna-installer.blob",
-	"disableExperimentalSEAWarning": true,
-	"useCodeCache": true
-}
