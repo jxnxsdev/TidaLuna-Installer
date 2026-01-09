@@ -1,9 +1,9 @@
 mod args;
 mod cli;
-mod ui;
-
-mod utils;
+mod installer;
 mod types;
+mod ui;
+mod utils;
 
 use clap::Parser;
 use args::Args;

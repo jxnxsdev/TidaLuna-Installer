@@ -23,7 +23,6 @@ impl ReleaseLoader {
         }
     }
 
-    /// Fetches and loads release sources from the configured URL.
     pub async fn load_release_sources(&mut self) -> anyhow::Result<()> {
         let resp = self.client.get(&self.release_sources_url).send().await?;
         if !resp.status().is_success() {
@@ -33,7 +32,6 @@ impl ReleaseLoader {
         Ok(())
     }
 
-    /// Processes a direct release source by fetching and assigning IDs.
     async fn process_direct_release_source(&self, source: &ReleaseSource) -> anyhow::Result<Vec<Release>> {
         let resp = self.client.get(&source.url).send().await?;
         if !resp.status().is_success() {
@@ -46,7 +44,6 @@ impl ReleaseLoader {
         Ok(releases)
     }
 
-    /// Extracts the channel name from a version tag.
     fn extract_channel_name(tag: &str) -> String {
         let clean = tag.trim_start_matches('v');
 
@@ -66,7 +63,6 @@ impl ReleaseLoader {
         clean.to_string()
     }
 
-    /// Processes a GitHub release source by fetching releases and grouping by channel.
     async fn process_github_release_source(&self, source: &ReleaseSource) -> anyhow::Result<Vec<Release>> {
         let release_url = format!("https://api.github.com/repos/{}/releases", source.url);
         let resp = self.client
@@ -86,7 +82,6 @@ impl ReleaseLoader {
             for release in array {
                 if let Some(tag) = release.get("tag_name").and_then(|v| v.as_str()) {
                     let channel_name = Self::extract_channel_name(tag);
-
                     let version = ReleaseVersion {
                         version: tag.to_string(),
                         download: format!("https://github.com/{}/releases/download/{}/luna.zip", source.url, tag),
@@ -107,8 +102,6 @@ impl ReleaseLoader {
         Ok(grouped.into_values().collect())
     }
 
-    /// Loads all releases from configured sources.
-    /// Returns a cached result on subsequent calls.
     pub async fn load_releases(&mut self) -> anyhow::Result<&Vec<Release>> {
         if self.releases_loaded {
             return Ok(&self.releases);

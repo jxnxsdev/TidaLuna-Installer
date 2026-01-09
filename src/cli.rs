@@ -1,8 +1,20 @@
 use crate::args::Args;
-use crate::utils::release_loader::ReleaseLoader;
-use std::path::Path;
-use tokio::fs;
-use anyhow::Result;
+use crate::utils::{release_loader::ReleaseLoader, fs_helpers::get_tidal_directory};
+use std::path::PathBuf;
+use semver::Version;
+
+use crate::installer::{
+    steps::setup::SetupStep,
+    steps::download_luna::DownloadLunaStep,
+    steps::extract_luna::ExtractLunaStep,
+    steps::copy_asar_install::CopyAsarInstallStep,
+    steps::insert_luna::InsertLunaStep,
+    steps::kill_tidal::KillTidalStep,
+    steps::sign_tidal::SignTidalStep,
+    steps::uninstall::UninstallStep,
+    steps::copy_asar_uninstall::CopyAsarUninstallStep,
+    manager::InstallManager,
+};
 
 pub async fn run_cli(args: Args) {
     println!("TidaLuna Installer CLI\n");
@@ -23,8 +35,8 @@ pub async fn run_cli(args: Args) {
 
     // LIST VERSIONS
     if args.list_versions {
-        println!("Available releases and versions:\n");
-        for release in releases {
+        println!("Available releases:\n");
+        for release in releases.iter() {
             println!("Channel: {}", release.name);
             for version in &release.versions {
                 println!("  - {} ({})", version.version, version.download);
@@ -35,37 +47,105 @@ pub async fn run_cli(args: Args) {
 
     // INSTALL
     if args.install {
-        let version_to_install = args.version.as_deref().unwrap_or("stable");
-        let path = args.path.as_deref().unwrap_or(".");
+        let version_to_install = args.version.clone();
 
-        println!("Installing version '{}' to '{}'", version_to_install, path);
-
-        // Find the version in releases
-        let mut found = None;
-        for release in releases {
-            if release.name == version_to_install {
-                found = release.versions.first();
-                break;
-            }
-        }
-
-        if let Some(v) = found {
-            println!("Downloading from: {}", v.download);
-            // TODO: download & unpack logic here
+        // Determine release channel if no version provided: stable > beta > alpha
+        let selected_release = if let Some(ver) = &version_to_install {
+            releases.iter().find(|r| r.name == *ver)
         } else {
-            eprintln!("Version '{}' not found!", version_to_install);
+            releases.iter().find(|r| r.name == "stable")
+                .or_else(|| releases.iter().find(|r| r.name == "beta"))
+                .or_else(|| releases.iter().find(|r| r.name == "alpha"))
+        };
+
+        let selected_release = match selected_release {
+            Some(r) => r,
+            None => {
+                eprintln!("No release found to install!");
+                return;
+            }
+        };
+
+        // Pick the newest version using semver
+        let latest_version = selected_release
+            .versions
+            .iter()
+            .max_by(|a, b| {
+                let va = Version::parse(&a.version).unwrap_or_else(|_| Version::new(0, 0, 0));
+                let vb = Version::parse(&b.version).unwrap_or_else(|_| Version::new(0, 0, 0));
+                va.cmp(&vb)
+            })
+            .unwrap();
+
+        // Determine install path
+        let mut path: PathBuf = if let Some(p) = &args.path {
+            PathBuf::from(p)
+        } else {
+            get_tidal_directory().await.unwrap_or_else(|_| PathBuf::from("."))
+        };
+
+        // Ensure path ends with "resources"
+        if !path.ends_with("resources") {
+            path.push("resources");
         }
+
+        println!(
+            "Installing {} version {} to {:?}",
+            selected_release.name, latest_version.version, path
+        );
+
+        // Initialize InstallManager
+        let mut manager = InstallManager::new();
+        manager.add_step(Box::new(SetupStep { overwrite_path: Some(path.clone()) }));
+        manager.add_step(Box::new(KillTidalStep));
+        manager.add_step(Box::new(UninstallStep { overwrite_path: Some(path.clone()) }));
+        manager.add_step(Box::new(DownloadLunaStep {
+            download_url: latest_version.download.clone(),
+        }));
+        manager.add_step(Box::new(ExtractLunaStep));
+        manager.add_step(Box::new(CopyAsarInstallStep { overwrite_path: Some(path.clone()) }));
+        manager.add_step(Box::new(InsertLunaStep { overwrite_path: Some(path.clone()) }));
+        manager.add_step(Box::new(SignTidalStep));
+
+        // Run all steps
+        manager.run(
+            |sublog| println!("SUBLOG: {}", sublog),
+            |steplog| println!("STEPLOG: {}", steplog),
+        ).await;
+
         return;
     }
 
     // UNINSTALL
     if args.uninstall {
-        let path = args.path.as_deref().unwrap_or(".");
-        println!("Uninstalling from '{}'", path);
+        let mut path: PathBuf = if let Some(p) = &args.path {
+            PathBuf::from(p)
+        } else {
+            get_tidal_directory().await.unwrap_or_else(|_| PathBuf::from("."))
+        };
 
-        // TODO: implement uninstall logic (delete installed files)
+        // Ensure path ends with "resources"
+        if !path.ends_with("resources") {
+            path.push("resources");
+        }
+
+        println!("Uninstalling from {:?}", path);
+        
+        // Initialize InstallManager for uninstallation
+        let mut manager = InstallManager::new();
+        manager.add_step(Box::new(KillTidalStep));
+        manager.add_step(Box::new(CopyAsarUninstallStep { overwrite_path: Some(path.clone()) }));
+        manager.add_step(Box::new(UninstallStep { overwrite_path: Some(path.clone()) }));
+        manager.add_step(Box::new(SignTidalStep));
+
+        // Run all steps
+        manager.run(
+            |sublog| println!("SUBLOG: {}", sublog),
+            |steplog| println!("STEPLOG: {}", steplog),
+        ).await;
+
         return;
     }
 
-    println!("No action specified. Use -i, -u, or -l.");
+    println!("No valid command provided. Use --help for usage information.");
 }
