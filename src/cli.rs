@@ -16,6 +16,19 @@ use crate::installer::{
     manager::InstallManager,
 };
 
+fn print_step_separator(step_name: &str) {
+    println!("\n{}", "=".repeat(60));
+    println!("== {} ", step_name);
+    println!("{}", "=".repeat(60));
+}
+
+fn print_failure_banner(step_name: &str, message: &str) {
+    println!("\n{}", "!".repeat(60));
+    println!("!! STEP FAILED: {} !!", step_name);
+    println!("!! {} !!", message);
+    println!("{}", "!".repeat(60));
+}
+
 pub async fn run_cli(args: Args) {
     println!("TidaLuna Installer CLI\n");
 
@@ -84,33 +97,35 @@ pub async fn run_cli(args: Args) {
             get_tidal_directory().await.unwrap_or_else(|_| PathBuf::from("."))
         };
 
-        // Ensure path ends with "resources"
         if !path.ends_with("resources") {
             path.push("resources");
         }
 
         println!(
-            "Installing {} version {} to {:?}",
+            "\nInstalling {} version {} to {:?}\n",
             selected_release.name, latest_version.version, path
         );
 
-        // Initialize InstallManager
         let mut manager = InstallManager::new();
         manager.add_step(Box::new(SetupStep { overwrite_path: Some(path.clone()) }));
         manager.add_step(Box::new(KillTidalStep));
         manager.add_step(Box::new(UninstallStep { overwrite_path: Some(path.clone()) }));
-        manager.add_step(Box::new(DownloadLunaStep {
-            download_url: latest_version.download.clone(),
-        }));
+        manager.add_step(Box::new(DownloadLunaStep { download_url: latest_version.download.clone() }));
         manager.add_step(Box::new(ExtractLunaStep));
         manager.add_step(Box::new(CopyAsarInstallStep { overwrite_path: Some(path.clone()) }));
         manager.add_step(Box::new(InsertLunaStep { overwrite_path: Some(path.clone()) }));
         manager.add_step(Box::new(SignTidalStep));
 
-        // Run all steps
+        // Run steps with nice console output
         manager.run(
-            |sublog| println!("SUBLOG: {}", sublog),
-            |steplog| println!("STEPLOG: {}", steplog),
+            |sublog| println!("    {}", sublog),
+            |steplog| println!("{}", steplog),
+            |step_name| print_step_separator(&step_name),
+            |success| {
+                if !success {
+                    print_failure_banner("Step Failed", "See above for details.");
+                }
+            },
         ).await;
 
         return;
@@ -124,24 +139,33 @@ pub async fn run_cli(args: Args) {
             get_tidal_directory().await.unwrap_or_else(|_| PathBuf::from("."))
         };
 
-        // Ensure path ends with "resources"
         if !path.ends_with("resources") {
             path.push("resources");
         }
 
-        println!("Uninstalling from {:?}", path);
-        
-        // Initialize InstallManager for uninstallation
+        println!("\nUninstalling from {:?}\n", path);
+
         let mut manager = InstallManager::new();
         manager.add_step(Box::new(KillTidalStep));
         manager.add_step(Box::new(CopyAsarUninstallStep { overwrite_path: Some(path.clone()) }));
         manager.add_step(Box::new(UninstallStep { overwrite_path: Some(path.clone()) }));
         manager.add_step(Box::new(SignTidalStep));
 
-        // Run all steps
         manager.run(
-            |sublog| println!("SUBLOG: {}", sublog),
-            |steplog| println!("STEPLOG: {}", steplog),
+            |sublog| println!("    {}", sublog),
+            |steplog| {
+                if steplog.contains("failed") || steplog.contains("Failed") {
+                    print_failure_banner("Step Failed", &steplog);
+                } else {
+                    println!("{}", steplog);
+                }
+            },
+            |step_name| print_step_separator(&step_name),
+            |success| {
+                if !success {
+                    print_failure_banner("Step Failed", "See above for details.");
+                }
+            },
         ).await;
 
         return;
