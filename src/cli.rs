@@ -1,5 +1,5 @@
 use crate::args::Args;
-use crate::utils::{release_loader::ReleaseLoader, fs_helpers::get_tidal_directory};
+use crate::utils::{release_loader::ReleaseLoader, fs_helpers::get_tidal_directory, fs_helpers::is_luna_installed};
 use std::path::PathBuf;
 use semver::Version;
 
@@ -60,6 +60,11 @@ pub async fn run_cli(args: Args) {
 
     // INSTALL
     if args.install {
+        if is_luna_installed().await.unwrap_or(false) {
+            println!("TidaLuna / Neptune is already installed. Please uninstall first before installing again.");
+            return;
+        }
+
         let version_to_install = args.version.clone();
 
         // Determine release channel if no version provided: stable > beta > alpha
