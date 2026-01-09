@@ -1,1 +1,1 @@
-pub mod browser_helper;
+pub mod release_loader;
