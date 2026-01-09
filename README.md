@@ -2,6 +2,8 @@
 
 # TidaLuna Installer
 
+## Info: Versions 2.1.18 and up of the installer currently produce virus warnings in windows defender. This is because of the nature of how the installer works and i'm working on fixing it. For now, you can either allow the file in windows defender settings or use version 2.1.17 (currently marked as the latest release). The installer itself is safe and does not contain marlware (yes this might not sound very trustable coming from the person who made it, but feel free to look at the source code and the build process).
+
 <p align="center">
   <a href="https://github.com/jxnxsdev/TidaLuna-Installer/releases">
     <img src="https://img.shields.io/github/v/release/jxnxsdev/TidaLuna-Installer?style=for-the-badge" />
