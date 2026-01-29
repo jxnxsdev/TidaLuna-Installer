@@ -1,6 +1,2 @@
-node_modules/
-build/
-compiled/
-es_build/
-tsconfig.tsbuildinfo
-dist/
+target/
+Cargo.lock

@@ -1,0 +1,9 @@
+pub mod setup;
+pub mod download_luna;
+pub mod extract_luna;
+pub mod copy_asar_install;
+pub mod insert_luna;
+pub mod kill_tidal;
+pub mod sign_tidal;
+pub mod uninstall;
+pub mod copy_asar_uninstall;
