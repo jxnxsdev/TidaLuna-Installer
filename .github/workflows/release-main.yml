@@ -1,0 +1,186 @@
+name: "[main] Build & Release"
+
+on:
+  push:
+    branches:
+      - "main"
+
+permissions:
+  contents: write
+
+jobs:
+  Build:
+    name: Build ${{ matrix.platform.os-name }}
+    runs-on: ${{ matrix.platform.runs-on }}
+    strategy:
+      matrix:
+        platform:
+          - os-name: linux-x86_64
+            runs-on: ubuntu-latest
+            rust-target: x86_64-unknown-linux-gnu
+
+          - os-name: windows-x86_64
+            runs-on: windows-latest
+            rust-target: x86_64-pc-windows-msvc
+
+          - os-name: macOS-x86_64
+            runs-on: macOS-15-intel
+            rust-target: x86_64-apple-darwin
+
+          - os-name: macOS-aarch64
+            runs-on: macOS-latest
+            rust-target: aarch64-apple-darwin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get next version
+        id: get_version
+        run: |
+          # Get the latest release tag or default to v0.0.0
+          latest_tag=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $latest_tag"
+
+          # Extract version numbers
+          version=${latest_tag#v}
+          IFS='.' read -r major minor patch <<< "$version"
+          
+          # Increment patch version
+          patch=$((patch + 1))
+          new_version="v$major.$minor.$patch"
+
+          echo "New version: $new_version"
+          echo "new_tag=$new_version" >> "$GITHUB_OUTPUT"
+          echo "version_tag=$new_version" >> "$GITHUB_OUTPUT"
+
+      - name: Install GitHub CLI (gh)
+        run: |
+          if command -v apt-get &> /dev/null; then
+            sudo apt update
+            sudo apt install -y gh
+          elif command -v brew &> /dev/null; then
+            brew install gh
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            choco install gh
+          fi
+
+      - name: Authenticate GitHub CLI
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.rust-target }}
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust-cache"
+
+      - name: Build for Linux
+        if: matrix.platform.os-name == 'linux-x86_64'
+        run: |
+          cargo build --release --target ${{ matrix.platform.rust-target }}
+          mv target/${{ matrix.platform.rust-target }}/release/tidaluna-installer ./installer-linux-x86_64-${{ steps.get_version.outputs.new_tag }}
+          chmod +x ./installer-linux-x86_64-${{ steps.get_version.outputs.new_tag }}
+
+      - name: Build for Windows
+        if: matrix.platform.os-name == 'windows-x86_64'
+        run: |
+          cargo build --release --target ${{ matrix.platform.rust-target }}
+          move target\${{ matrix.platform.rust-target }}\release\tidaluna-installer.exe installer-windows-x86_64-${{ steps.get_version.outputs.new_tag }}.exe
+
+      - name: Build for macOS (Intel)
+        if: matrix.platform.os-name == 'macOS-x86_64'
+        run: |
+          cargo build --release --target ${{ matrix.platform.rust-target }}
+          mv target/${{ matrix.platform.rust-target }}/release/tidaluna-installer ./installer-macOS-x86_64-${{ steps.get_version.outputs.new_tag }}
+          chmod +x ./installer-macOS-x86_64-${{ steps.get_version.outputs.new_tag }}
+
+      - name: Build for macOS (Apple Silicon)
+        if: matrix.platform.os-name == 'macOS-aarch64'
+        run: |
+          cargo build --release --target ${{ matrix.platform.rust-target }}
+          mv target/${{ matrix.platform.rust-target }}/release/tidaluna-installer ./installer-macOS-aarch64-${{ steps.get_version.outputs.new_tag }}
+          chmod +x ./installer-macOS-aarch64-${{ steps.get_version.outputs.new_tag }}
+
+      - name: Create artifacts directory
+        run: |
+          mkdir -p ./artifacts
+
+      - name: Prepare artifact for Linux/macOS
+        if: matrix.platform.runs-on != 'windows-latest'
+        run: |
+          # Copy the binary to artifacts with versioned name
+          cp installer-* ./artifacts/
+
+      - name: Prepare artifact for Windows
+        if: matrix.platform.runs-on == 'windows-latest'
+        run: |
+          # Copy the binary to artifacts with versioned name
+          copy installer-* .\artifacts\
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform.os-name }}-${{ steps.get_version.outputs.new_tag }}
+          path: ./artifacts/
+
+  Release:
+    name: Create Release with Auto-Version
+    needs: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Get next version (same logic as Build job)
+        id: get_tag
+        run: |
+          # Get the latest release tag or default to v0.0.0
+          latest_tag=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $latest_tag"
+
+          # Extract version numbers
+          version=${latest_tag#v}
+          IFS='.' read -r major minor patch <<< "$version"
+          
+          # Increment patch version
+          patch=$((patch + 1))
+          new_version="v$major.$minor.$patch"
+
+          echo "New version: $new_version"
+          echo "new_tag=$new_version" >> "$GITHUB_OUTPUT"
+
+      - name: Install GitHub CLI (gh)
+        run: |
+          sudo apt update
+          sudo apt install -y gh
+
+      - name: Authenticate GitHub CLI
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts/
+          pattern: '*-${{ steps.get_tag.outputs.new_tag }}'
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        run: |
+          # List all artifacts for debugging
+          echo "Artifacts to be included in release:"
+          find ./artifacts -type f -name "*" | while read file; do
+            echo "- $(basename "$file")"
+          done
+
+          # Create release with all artifacts
+          gh release create "${{ steps.get_tag.outputs.new_tag }}" \
+            --title "Release ${{ steps.get_tag.outputs.new_tag }}" \
+            --generate-notes \
+            --latest \
+            ./artifacts/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
