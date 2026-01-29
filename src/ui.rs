@@ -395,7 +395,7 @@ impl Application for MyApp {
             .padding(10)
         };
 
-        let path_label = text("Installation Path (optional)")
+        let path_label = text("Installation Path (optional) (needs to end with 'resources' or 'Resources')")
             .size(16);
 
         let path_input = text_input(
@@ -751,7 +751,7 @@ async fn install_async(
         };
 
         let mut final_path = install_path;
-        if !final_path.ends_with("resources") {
+        if !final_path.ends_with("resources") && !final_path.ends_with("Resources") {
             final_path.push("resources");
         }
 
