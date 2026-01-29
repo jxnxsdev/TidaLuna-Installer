@@ -102,7 +102,7 @@ pub async fn run_cli(args: Args) {
             get_tidal_directory().await.unwrap_or_else(|_| PathBuf::from("."))
         };
 
-        if !path.ends_with("resources") {
+        if !path.ends_with("resources") && !path.ends_with("Resources") {
             path.push("resources");
         }
 
