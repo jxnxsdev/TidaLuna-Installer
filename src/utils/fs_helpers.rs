@@ -35,6 +35,7 @@ pub async fn get_tidal_directory() -> io::Result<PathBuf> {
         "linux" => {
             let paths = vec![
                 "/var/lib/flatpak/app/com.mastermindzh.tidal-hifi/current/active/files/lib/tidal-hifi/resources/",
+                "~/.local/share/flatpak/app/com.mastermindzh.tidal-hifi/current/active/files/lib/tidal-hifi/resources/",
                 "/opt/tidal-hifi/resources/",
             ];
 
