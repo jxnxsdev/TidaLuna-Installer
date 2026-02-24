@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use std::path::PathBuf;
 use tokio::fs;
 use crate::installer::step::{InstallStep, StepResult, SubLog};
-use crate::utils::fs_helpers::get_tidal_directory;
+use crate::utils::fs_helpers::{get_tidal_directory, has_tidal_app_asar};
 
 /// SetupStep: creates temporary directory and checks if Tidal is installed
 pub struct SetupStep {
@@ -56,26 +56,10 @@ impl InstallStep for SetupStep {
             };
         }
 
-        let mut has_asar = false;
-        if let Ok(mut entries) = fs::read_dir(&tidal_path).await {
-            while let Ok(Some(entry)) = entries.next_entry().await {
-                if let Ok(file_type) = entry.file_type().await {
-                    if file_type.is_file() {
-                        if let Some(ext) = entry.path().extension() {
-                            if ext == "asar" {
-                                has_asar = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if !has_asar {
+        if !has_tidal_app_asar(&tidal_path) {
             return StepResult {
                 success: false,
-                message: "No .asar files found — Tidal is not installed correctly".into(),
+                message: "app.asar not found — Tidal is not installed correctly".into(),
             };
         }
 

@@ -1,4 +1,4 @@
-use crate::installer::step::{InstallStep, StepResult, SubLog};
+use crate::installer::step::{InstallStep, SubLog};
 
 pub struct InstallManager {
     pub steps: Vec<Box<dyn InstallStep + Send + Sync>>,

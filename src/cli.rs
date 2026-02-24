@@ -1,5 +1,8 @@
 use crate::args::Args;
-use crate::utils::{release_loader::ReleaseLoader, fs_helpers::get_tidal_directory, fs_helpers::is_luna_installed};
+use crate::utils::{
+    release_loader::ReleaseLoader,
+    fs_helpers::{get_tidal_directory, is_luna_installed, normalize_tidal_resources_path},
+};
 use std::path::PathBuf;
 use semver::Version;
 
@@ -11,6 +14,7 @@ use crate::installer::{
     steps::insert_luna::InsertLunaStep,
     steps::kill_tidal::KillTidalStep,
     steps::sign_tidal::SignTidalStep,
+    steps::launch_tidal::LaunchTidalStep,
     steps::uninstall::UninstallStep,
     steps::copy_asar_uninstall::CopyAsarUninstallStep,
     manager::InstallManager,
@@ -61,8 +65,7 @@ pub async fn run_cli(args: Args) {
     // INSTALL
     if args.install {
         if is_luna_installed().await.unwrap_or(false) {
-            println!("TidaLuna / Neptune is already installed. Please uninstall first before installing again.");
-            return;
+            println!("TidaLuna / Neptune is already installed. Continuing with reinstall.");
         }
 
         let version_to_install = args.version.clone();
@@ -96,15 +99,17 @@ pub async fn run_cli(args: Args) {
             .unwrap();
 
         // Determine install path
-        let mut path: PathBuf = if let Some(p) = &args.path {
-            PathBuf::from(p)
+        let path: PathBuf = if let Some(p) = &args.path {
+            normalize_tidal_resources_path(PathBuf::from(p))
         } else {
-            get_tidal_directory().await.unwrap_or_else(|_| PathBuf::from("."))
+            match get_tidal_directory().await {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("Failed to find TIDAL resources directory: {}", e);
+                    return;
+                }
+            }
         };
-
-        if !path.ends_with("resources") && !path.ends_with("Resources") {
-            path.push("resources");
-        }
 
         println!(
             "\nInstalling {} version {} to {:?}\n",
@@ -120,6 +125,10 @@ pub async fn run_cli(args: Args) {
         manager.add_step(Box::new(CopyAsarInstallStep { overwrite_path: Some(path.clone()) }));
         manager.add_step(Box::new(InsertLunaStep { overwrite_path: Some(path.clone()) }));
         manager.add_step(Box::new(SignTidalStep));
+        manager.add_step(Box::new(LaunchTidalStep {
+            overwrite_path: Some(path.clone()),
+            suppress_console_window: false,
+        }));
 
         // Run steps with nice console output
         manager.run(
@@ -138,15 +147,17 @@ pub async fn run_cli(args: Args) {
 
     // UNINSTALL
     if args.uninstall {
-        let mut path: PathBuf = if let Some(p) = &args.path {
-            PathBuf::from(p)
+        let path: PathBuf = if let Some(p) = &args.path {
+            normalize_tidal_resources_path(PathBuf::from(p))
         } else {
-            get_tidal_directory().await.unwrap_or_else(|_| PathBuf::from("."))
+            match get_tidal_directory().await {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("Failed to find TIDAL resources directory: {}", e);
+                    return;
+                }
+            }
         };
-
-        if !path.ends_with("resources") {
-            path.push("resources");
-        }
 
         println!("\nUninstalling from {:?}\n", path);
 
@@ -155,6 +166,10 @@ pub async fn run_cli(args: Args) {
         manager.add_step(Box::new(CopyAsarUninstallStep { overwrite_path: Some(path.clone()) }));
         manager.add_step(Box::new(UninstallStep { overwrite_path: Some(path.clone()) }));
         manager.add_step(Box::new(SignTidalStep));
+        manager.add_step(Box::new(LaunchTidalStep {
+            overwrite_path: Some(path.clone()),
+            suppress_console_window: false,
+        }));
 
         manager.run(
             |sublog| println!("    {}", sublog),

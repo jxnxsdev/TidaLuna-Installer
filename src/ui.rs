@@ -1,10 +1,10 @@
 use iced::{
-    executor, Alignment, Application, Color, Command, Element, Length, Settings, Size, Subscription,
-    Theme,
+    executor, Alignment, Application, Background, Border, Color, Command, Element, Length,
+    Settings, Shadow, Size, Subscription, Theme, Vector,
 };
 use iced::widget::{
-    button, checkbox, column, combo_box, horizontal_space, progress_bar, row, scrollable, text,
-    text_input, vertical_space, Column, Container, Row, Scrollable, Space,
+    button, checkbox, combo_box, horizontal_space, progress_bar, scrollable, text, text_input,
+    Column, Container, Row, Scrollable,
 };
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -16,12 +16,12 @@ use crate::installer::{
         copy_asar_install::CopyAsarInstallStep, copy_asar_uninstall::CopyAsarUninstallStep,
         download_luna::DownloadLunaStep, extract_luna::ExtractLunaStep,
         insert_luna::InsertLunaStep, kill_tidal::KillTidalStep, setup::SetupStep,
-        sign_tidal::SignTidalStep, uninstall::UninstallStep,
+        sign_tidal::SignTidalStep, launch_tidal::LaunchTidalStep, uninstall::UninstallStep,
     },
     manager::InstallManager,
 };
 use crate::utils::{
-    fs_helpers::{get_tidal_directory, is_luna_installed},
+    fs_helpers::{get_tidal_directory, is_luna_installed, normalize_tidal_resources_path},
     release_loader::ReleaseLoader,
 };
 use semver::Version;
@@ -54,7 +54,6 @@ pub enum Message {
     InstallationStep(String),
     InstallationSubStep(String),
     InstallationComplete(Result<(), String>),
-    CheckInstallationStatus,
     InstallationStatus(bool),
     ToggleAdvancedOptions(bool),
     ClearLog,
@@ -67,11 +66,11 @@ pub struct MyApp {
     selected_channel: String,
     selected_version: String,
     install_path: String,
-    isLoading: bool,
-    isInstalling: bool,
-    isUninstalling: bool,
-    isAdvancedOpen: bool,
-    isLunaInstalled: bool,
+    is_loading: bool,
+    is_installing: bool,
+    is_uninstalling: bool,
+    is_advanced_open: bool,
+    is_luna_installed: bool,
 
     channel_pick_list: combo_box::State<String>,
     version_pick_list: combo_box::State<String>,
@@ -94,7 +93,6 @@ struct LogEntry {
 enum LogLevel {
     Info,
     Success,
-    Warning,
     Error,
     Step,
     SubStep,
@@ -110,11 +108,11 @@ impl Default for MyApp {
             selected_channel: String::new(),
             selected_version: String::new(),
             install_path: String::new(),
-            isLoading: true,
-            isInstalling: false,
-            isUninstalling: false,
-            isAdvancedOpen: false,
-            isLunaInstalled: false,
+            is_loading: true,
+            is_installing: false,
+            is_uninstalling: false,
+            is_advanced_open: false,
+            is_luna_installed: false,
             channel_pick_list,
             version_pick_list,
             log_entries: Vec::new(),
@@ -164,14 +162,14 @@ impl Application for MyApp {
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
             Message::LoadReleases => {
-                self.isLoading = true;
+                self.is_loading = true;
                 self.add_log("Loading releases...", LogLevel::Info);
                 let runtime = self.runtime.clone();
                 Command::perform(load_releases_async(runtime), Message::ReleasesLoaded)
             }
 
             Message::ReleasesLoaded(result) => {
-                self.isLoading = false;
+                self.is_loading = false;
                 match result {
                     Ok(releases) => {
                         self.releases = releases;
@@ -248,7 +246,7 @@ impl Application for MyApp {
             }
 
             Message::Install => {
-                self.isInstalling = true;
+                self.is_installing = true;
                 self.clear_log();
                 self.add_log("Starting installation...", LogLevel::Step);
 
@@ -266,7 +264,7 @@ impl Application for MyApp {
             }
 
             Message::Uninstall => {
-                self.isUninstalling = true;
+                self.is_uninstalling = true;
                 self.clear_log();
                 self.add_log("Starting uninstallation...", LogLevel::Step);
 
@@ -291,8 +289,8 @@ impl Application for MyApp {
             }
 
             Message::InstallationComplete(result) => {
-                self.isInstalling = false;
-                self.isUninstalling = false;
+                self.is_installing = false;
+                self.is_uninstalling = false;
 
                 match result {
                     Ok(_) => {
@@ -309,15 +307,8 @@ impl Application for MyApp {
                 })
             }
 
-            Message::CheckInstallationStatus => {
-                let runtime = self.runtime.clone();
-                Command::perform(check_installation_async(runtime), |is_installed| {
-                    Message::InstallationStatus(is_installed)
-                })
-            }
-
             Message::InstallationStatus(is_installed) => {
-                self.isLunaInstalled = is_installed;
+                self.is_luna_installed = is_installed;
                 if is_installed {
                     self.add_log("TidaLuna is already installed", LogLevel::Info);
                 }
@@ -325,7 +316,12 @@ impl Application for MyApp {
             }
 
             Message::ToggleAdvancedOptions(is_open) => {
-                self.isAdvancedOpen = is_open;
+                self.is_advanced_open = is_open;
+                if is_open && self.install_path.trim().is_empty() {
+                    let runtime = self.runtime.clone();
+                    return Command::perform(get_default_install_path_async(runtime), Message::InstallPathChanged);
+                }
+
                 Command::none()
             }
 
@@ -337,23 +333,81 @@ impl Application for MyApp {
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let title = text("TidaLuna Installer")
-            .size(32)
-            .style(iced::theme::Text::Color(Color::from_rgb(0.2, 0.5, 0.8)));
-
-        let status_text = if self.isLunaInstalled {
-            text("Status: Installed ✓")
-                .size(16)
-                .style(iced::theme::Text::Color(Color::from_rgb(0.0, 0.7, 0.0)))
-        } else {
-            text("Status: Not installed")
-                .size(16)
-                .style(iced::theme::Text::Color(Color::from_rgb(0.7, 0.7, 0.7)))
+        let card_style = |_: &Theme| iced::widget::container::Appearance {
+            text_color: None,
+            background: Some(Background::Color(Color::from_rgba(0.11, 0.12, 0.16, 0.94))),
+            border: Border {
+                radius: 8.0.into(),
+                width: 1.0,
+                color: Color::from_rgba(0.45, 0.55, 0.9, 0.18),
+            },
+            shadow: Shadow {
+                color: Color::from_rgba(0.0, 0.0, 0.0, 0.45),
+                offset: Vector::new(0.0, 8.0),
+                blur_radius: 18.0,
+            },
         };
+
+        let warning_style = |_: &Theme| iced::widget::container::Appearance {
+            text_color: None,
+            background: Some(Background::Color(Color::from_rgba(0.26, 0.19, 0.08, 0.95))),
+            border: Border {
+                radius: 8.0.into(),
+                width: 1.0,
+                color: Color::from_rgba(0.95, 0.75, 0.25, 0.28),
+            },
+            shadow: Shadow {
+                color: Color::from_rgba(0.0, 0.0, 0.0, 0.38),
+                offset: Vector::new(0.0, 8.0),
+                blur_radius: 16.0,
+            },
+        };
+
+        let background_style = |_: &Theme| iced::widget::container::Appearance {
+            text_color: None,
+            background: Some(Background::Color(Color::from_rgb(0.06, 0.07, 0.10))),
+            border: Border::default(),
+            shadow: Shadow::default(),
+        };
+
+        let title = text("TidaLuna Installer")
+            .size(36)
+            .style(iced::theme::Text::Color(Color::from_rgb(0.55, 0.76, 0.96)));
+
+        let subtitle = text("Install or remove TidaLuna from a TIDAL installation.")
+            .size(14)
+            .style(iced::theme::Text::Color(Color::from_rgb(0.74, 0.76, 0.84)));
+
+        let subsubtitle = text("Works for the official TIDAL app and tidal-hifi. Note: If you are using the windows store version of TIDAL, please uninstall it and install the version from the official website.")
+            .size(12)
+            .style(iced::theme::Text::Color(Color::from_rgb(0.74, 0.76, 0.84)));
+
+        let status_text_label = if self.is_luna_installed {
+            text("Installed ✓")
+                .size(15)
+                .style(iced::theme::Text::Color(Color::from_rgb(0.64, 0.95, 0.68)))
+        } else {
+            text("Not installed")
+                .size(15)
+                .style(iced::theme::Text::Color(Color::from_rgb(0.86, 0.86, 0.90)))
+        };
+
+        let status_text = Container::new(
+            Row::new()
+                .spacing(8)
+                .align_items(Alignment::Center)
+                .push(
+                    text("Status")
+                        .size(13)
+                        .style(iced::theme::Text::Color(Color::from_rgb(0.66, 0.70, 0.80))),
+                )
+                .push(status_text_label),
+        )
+        .padding([6, 10]);
 
         let channel_label = text("Release Channel").size(16);
 
-        let channel_pick = if self.isLoading {
+        let channel_pick = if self.is_loading {
             combo_box(
                 &self.channel_pick_list,
                 "Loading...",
@@ -395,7 +449,7 @@ impl Application for MyApp {
             .padding(10)
         };
 
-        let path_label = text("Installation Path (optional) (needs to end with 'resources' or 'Resources')")
+        let path_label = text("Installation Path (optional)")
             .size(16);
 
         let path_input = text_input(
@@ -406,11 +460,11 @@ impl Application for MyApp {
         .padding(10)
         .width(Length::Fill);
 
-        let advanced_toggle = checkbox("Show advanced options", self.isAdvancedOpen)
+        let advanced_toggle = checkbox("Show advanced options", self.is_advanced_open)
             .on_toggle(|checked| Message::ToggleAdvancedOptions(checked))
             .size(16);
 
-        let advanced_section = if self.isAdvancedOpen {
+        let advanced_section = if self.is_advanced_open {
             Row::new()
                 .spacing(10)
                 .push(path_label.width(180))
@@ -419,12 +473,12 @@ impl Application for MyApp {
             Row::new()
         };
 
-        let install_button_text = if self.isLunaInstalled {
+        let install_button_text = if self.is_luna_installed {
             "Reinstall"
         } else {
             "Install"
         };
-        let install_button = if self.isInstalling || self.isUninstalling {
+        let install_button = if self.is_installing || self.is_uninstalling {
             button(
                 text(install_button_text)
                     .size(16)
@@ -444,9 +498,9 @@ impl Application for MyApp {
             .style(iced::theme::Button::Primary)
         };
 
-        let uninstall_button = if !self.isLunaInstalled
-            || self.isInstalling
-            || self.isUninstalling
+        let uninstall_button = if !self.is_luna_installed
+            || self.is_installing
+            || self.is_uninstalling
         {
             button(
                 text("Uninstall")
@@ -467,16 +521,16 @@ impl Application for MyApp {
             .style(iced::theme::Button::Destructive)
         };
 
-        let progress_indicator = if self.isInstalling || self.isUninstalling {
+        let progress_indicator = if self.is_installing || self.is_uninstalling {
             Row::new()
                 .spacing(10)
                 .align_items(Alignment::Center)
                 .push(
-                    progress_bar(0.0..=100.0, if self.isInstalling { 50.0 } else { 50.0 })
+                    progress_bar(0.0..=100.0, if self.is_installing { 50.0 } else { 50.0 })
                         .width(200),
                 )
                 .push(
-                    text(if self.isInstalling {
+                    text(if self.is_installing {
                         "Installing..."
                     } else {
                         "Uninstalling..."
@@ -488,6 +542,29 @@ impl Application for MyApp {
             Row::new()
         };
 
+        let legal_warning = Container::new(
+            Column::new()
+                .spacing(4)
+                .push(
+                    text("Usage Warning")
+                        .size(16)
+                        .style(iced::theme::Text::Color(Color::from_rgb(0.98, 0.80, 0.35))),
+                )
+                .push(
+                    text("You cannot pirate media with TidaLuna or bypass TIDAL's free-tier limitations.")
+                        .size(14)
+                        .style(iced::theme::Text::Color(Color::from_rgb(0.9, 0.9, 0.9))),
+                )
+                .push(
+                    text("Use only with a legitimate account. We will not help with issues related to piracy.")
+                        .size(13)
+                        .style(iced::theme::Text::Color(Color::from_rgb(0.7, 0.7, 0.7))),
+                ),
+        )
+        .padding(12)
+        .width(Length::Fill)
+        .style(warning_style);
+
         let log_title = text("Installation Log")
             .size(18)
             .style(iced::theme::Text::Color(Color::from_rgb(0.3, 0.3, 0.3)));
@@ -498,7 +575,6 @@ impl Application for MyApp {
                 let color = match entry.level {
                     LogLevel::Info => Color::from_rgb(0.3, 0.3, 0.3),
                     LogLevel::Success => Color::from_rgb(0.0, 0.6, 0.0),
-                    LogLevel::Warning => Color::from_rgb(0.8, 0.5, 0.0),
                     LogLevel::Error => Color::from_rgb(0.8, 0.2, 0.2),
                     LogLevel::Step => Color::from_rgb(0.2, 0.4, 0.8),
                     LogLevel::SubStep => Color::from_rgb(0.4, 0.4, 0.4),
@@ -534,7 +610,7 @@ impl Application for MyApp {
                                 .style(iced::theme::Text::Color(color)),
                         ),
                 )
-                .padding(5)
+                .padding([6, 8])
                 .width(Length::Fill)
                 .into()
             })
@@ -546,7 +622,7 @@ impl Application for MyApp {
         )
         .height(200);
 
-        let clear_log_button = if !self.isInstalling && !self.isUninstalling {
+        let clear_log_button = if !self.is_installing && !self.is_uninstalling {
             button(text("Clear Log").size(14))
                 .on_press(Message::ClearLog)
                 .padding(8)
@@ -560,87 +636,98 @@ impl Application for MyApp {
             .padding(8)
         };
 
+        let header_box = Container::new(
+            Column::new()
+                .spacing(10)
+                .push(
+                    Row::new()
+                        .spacing(10)
+                        .align_items(Alignment::Center)
+                        .push(title)
+                        .push(horizontal_space())
+                        .push(status_text),
+                )
+                .push(subtitle)
+                .push(subsubtitle),
+        )
+        .padding(18)
+        .width(Length::Fill)
+        .style(card_style);
+
+        let main_box = Container::new(
+            Column::new()
+                .spacing(18)
+                .push(
+                    Row::new()
+                        .spacing(20)
+                        .align_items(Alignment::End)
+                        .push(
+                            Column::new()
+                                .spacing(6)
+                                .width(260)
+                                .push(channel_label)
+                                .push(channel_pick),
+                        )
+                        .push(
+                            Column::new()
+                                .spacing(6)
+                                .width(260)
+                                .push(version_label)
+                                .push(version_pick),
+                        )
+                        .push(
+                            Column::new()
+                                .spacing(6)
+                                .width(200)
+                                .push(advanced_toggle),
+                        ),
+                )
+                .push(if self.is_advanced_open {
+                    Row::new().spacing(10).push(advanced_section)
+                } else {
+                    Row::new()
+                })
+                .push(
+                    Row::new()
+                        .spacing(15)
+                        .align_items(Alignment::Center)
+                        .push(install_button)
+                        .push(uninstall_button)
+                        .push(horizontal_space())
+                        .push(progress_indicator),
+                )
+                .push(
+                    Column::new()
+                        .spacing(10)
+                        .push(
+                            Row::new()
+                                .spacing(10)
+                                .align_items(Alignment::Center)
+                                .push(log_title)
+                                .push(horizontal_space())
+                                .push(clear_log_button),
+                        )
+                        .push(log_content),
+                ),
+        )
+        .padding(18)
+        .width(Length::Fill)
+        .style(card_style);
+
         let content = Column::new()
-            .spacing(15)
-            .padding(25)
-            .max_width(900)
-            .push(
-                Row::new()
-                    .spacing(10)
-                    .align_items(Alignment::Center)
-                    .push(title)
-                    .push(horizontal_space())
-                    .push(status_text)
-            )
-            .push(Space::with_height(15))
-            
-            .push(
-                Row::new()
-                    .spacing(20)
-                    .align_items(Alignment::End)
-                    .push(
-                        Column::new()
-                            .spacing(5)
-                            .width(250)
-                            .push(channel_label)
-                            .push(channel_pick)
-                    )
-                    .push(
-                        Column::new()
-                            .spacing(5)
-                            .width(250)
-                            .push(version_label)
-                            .push(version_pick)
-                    )
-                    .push(
-                        Column::new()
-                            .spacing(5)
-                            .width(200)
-                            .push(advanced_toggle)
-                    )
-            )
-            
-            .push(if self.isAdvancedOpen {
-                Row::new()
-                    .spacing(10)
-                    .push(advanced_section)
-            } else {
-                Row::new()
-            })
-            
-            .push(Space::with_height(20))
-            
-            .push(
-                Row::new()
-                    .spacing(15)
-                    .align_items(Alignment::Center)
-                    .push(install_button)
-                    .push(uninstall_button)
-                    .push(horizontal_space())
-                    .push(progress_indicator)
-            )
-            
-            .push(Space::with_height(20))
-            
-            .push(
-                Column::new()
-                    .spacing(5)
-                    .push(
-                        Row::new()
-                            .spacing(10)
-                            .align_items(Alignment::Center)
-                            .push(log_title)
-                            .push(horizontal_space())
-                            .push(clear_log_button)
-                    )
-                    .push(log_content)
-            );
+            .spacing(16)
+            .padding(24)
+            .width(Length::Fill)
+            .push(header_box)
+            .push(legal_warning)
+            .push(main_box);
 
         Container::new(
             Scrollable::new(Container::new(content).width(Length::Fill).center_x()),
         )
         .width(Length::Fill)
         .height(Length::Fill)
+        .style(background_style)
         .center_y()
         .into()
     }
@@ -722,6 +809,19 @@ async fn check_installation_async(runtime: Arc<Runtime>) -> bool {
     result.unwrap_or(false)
 }
 
+async fn get_default_install_path_async(runtime: Arc<Runtime>) -> String {
+    let result = runtime
+        .spawn(async move {
+            match get_tidal_directory().await {
+                Ok(path) => path.to_string_lossy().to_string(),
+                Err(_) => String::new(),
+            }
+        })
+        .await;
+
+    result.unwrap_or_default()
+}
+
 async fn install_async(
     releases: Vec<AppRelease>,
     channel: String,
@@ -742,18 +842,13 @@ async fn install_async(
             .find(|v| v.version == version)
             .ok_or_else(|| format!("Version '{}' not found in channel '{}'", version, channel))?;
 
-        let install_path = if !path.trim().is_empty() {
-            PathBuf::from(path)
+        let final_path = if !path.trim().is_empty() {
+            normalize_tidal_resources_path(PathBuf::from(path))
         } else {
             get_tidal_directory()
                 .await
                 .map_err(|e| format!("Failed to get Tidal directory: {}", e))?
         };
-
-        let mut final_path = install_path;
-        if !final_path.ends_with("resources") && !final_path.ends_with("Resources") {
-            final_path.push("resources");
-        }
 
         let mut manager = InstallManager::new();
 
@@ -775,6 +870,10 @@ async fn install_async(
             overwrite_path: Some(final_path.clone()),
         }));
         manager.add_step(Box::new(SignTidalStep));
+        manager.add_step(Box::new(LaunchTidalStep {
+            overwrite_path: Some(final_path.clone()),
+            suppress_console_window: true,
+        }));
 
         manager
             .run(
@@ -821,18 +920,13 @@ async fn uninstall_async(
     runtime: Arc<Runtime>,
 ) -> Result<(), String> {
     let result = runtime.spawn(async move {
-        let uninstall_path = if !path.trim().is_empty() {
-            PathBuf::from(path)
+        let final_path = if !path.trim().is_empty() {
+            normalize_tidal_resources_path(PathBuf::from(path))
         } else {
             get_tidal_directory()
                 .await
                 .map_err(|e| format!("Failed to get Tidal directory: {}", e))?
         };
-
-        let mut final_path = uninstall_path;
-        if !final_path.ends_with("resources") {
-            final_path.push("resources");
-        }
 
         let mut manager = InstallManager::new();
 
@@ -844,6 +938,10 @@ async fn uninstall_async(
             overwrite_path: Some(final_path.clone()),
         }));
         manager.add_step(Box::new(SignTidalStep));
+        manager.add_step(Box::new(LaunchTidalStep {
+            overwrite_path: Some(final_path.clone()),
+            suppress_console_window: true,
+        }));
 
         manager
             .run(
