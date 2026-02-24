@@ -2,7 +2,6 @@ use crate::installer::step::{InstallStep, StepResult, SubLog};
 use async_trait::async_trait;
 use std::fs;
 use std::fs::File;
-use std::path::Path;
 use zip::ZipArchive;
 
 pub struct ExtractLunaStep;

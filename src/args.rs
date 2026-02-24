@@ -2,7 +2,7 @@ use clap::Parser;
 
 /// TidaLuna Installer CLI
 #[derive(Parser, Debug)]
-#[command(author, version, about)]
+#[command(author, version, about, disable_version_flag = true)]
 pub struct Args {
     /// Run in headless CLI mode
     #[arg(long)]

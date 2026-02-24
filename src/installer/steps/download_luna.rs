@@ -1,6 +1,5 @@
 use crate::installer::step::{InstallStep, StepResult, SubLog};
 use async_trait::async_trait;
-use std::path::PathBuf;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 

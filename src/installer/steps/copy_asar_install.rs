@@ -3,7 +3,6 @@ use crate::utils::fs_helpers::get_tidal_directory;
 use async_trait::async_trait;
 use std::path::PathBuf;
 use tokio::fs;
-use tokio::io;
 
 pub struct CopyAsarInstallStep {
     pub overwrite_path: Option<PathBuf>,

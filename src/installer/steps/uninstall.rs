@@ -19,7 +19,16 @@ impl InstallStep for UninstallStep {
             path.clone()
         } else {
             match crate::utils::fs_helpers::get_tidal_directory().await {
-                Ok(p) => p,
+                Ok(p) if !p.as_os_str().is_empty() => p,
+                Ok(_) => {
+                    sublog_callback(SubLog {
+                        message: "Tidal path could not be resolved".into(),
+                    });
+                    return StepResult {
+                        success: false,
+                        message: "Invalid Tidal path".into(),
+                    };
+                }
                 Err(err) => {
                     sublog_callback(SubLog {
                         message: format!("Tidal is not installed: {}", err),

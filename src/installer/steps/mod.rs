@@ -5,5 +5,6 @@ pub mod copy_asar_install;
 pub mod insert_luna;
 pub mod kill_tidal;
 pub mod sign_tidal;
+pub mod launch_tidal;
 pub mod uninstall;
 pub mod copy_asar_uninstall;
