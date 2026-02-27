@@ -17,12 +17,17 @@ impl InstallStep for ExtractLunaStep {
         let zip_path = temp_dir.join("Luna.zip");
         let extract_path = temp_dir.join("LunaExtracted");
 
-        sublog_callback(SubLog { message: format!("Ensuring extract path exists: {:?}", extract_path) });
-        
-        if !extract_path.exists() {
-            if let Err(e) = fs::create_dir_all(&extract_path) {
-                return StepResult { success: false, message: format!("Failed to create extract dir: {}", e) };
+        if extract_path.exists() {
+            sublog_callback(SubLog { message: format!("Cleaning existing extract path: {:?}", extract_path) });
+            if let Err(e) = fs::remove_dir_all(&extract_path) {
+                return StepResult { success: false, message: format!("Failed to clean extract dir: {}", e) };
             }
+        }
+
+        sublog_callback(SubLog { message: format!("Ensuring extract path exists: {:?}", extract_path) });
+
+        if let Err(e) = fs::create_dir_all(&extract_path) {
+            return StepResult { success: false, message: format!("Failed to create extract dir: {}", e) };
         }
 
         sublog_callback(SubLog { message: "Extracting Luna...".into() });

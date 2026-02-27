@@ -81,10 +81,33 @@ impl ReleaseLoader {
         if let Some(array) = data.as_array() {
             for release in array {
                 if let Some(tag) = release.get("tag_name").and_then(|v| v.as_str()) {
+                    let download_url = release
+                        .get("assets")
+                        .and_then(|assets| assets.as_array())
+                        .and_then(|assets| {
+                            assets.iter().find_map(|asset| {
+                                let name = asset.get("name").and_then(|v| v.as_str())?;
+                                if name.to_ascii_lowercase().ends_with(".zip") {
+                                    asset
+                                        .get("browser_download_url")
+                                        .and_then(|v| v.as_str())
+                                        .map(|s| s.to_string())
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                        .unwrap_or_else(|| {
+                            format!(
+                                "https://github.com/{}/releases/download/{}/luna.zip",
+                                source.url, tag
+                            )
+                        });
+
                     let channel_name = Self::extract_channel_name(tag);
                     let version = ReleaseVersion {
                         version: tag.to_string(),
-                        download: format!("https://github.com/{}/releases/download/{}/luna.zip", source.url, tag),
+                        download: download_url,
                     };
 
                     grouped.entry(channel_name.clone())

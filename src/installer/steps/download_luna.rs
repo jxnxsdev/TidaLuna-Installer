@@ -3,6 +3,16 @@ use async_trait::async_trait;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
+fn has_zip_signature(bytes: &[u8]) -> bool {
+    const PK_LOCAL_FILE_HEADER: [u8; 4] = [0x50, 0x4B, 0x03, 0x04];
+    const PK_EMPTY_ARCHIVE: [u8; 4] = [0x50, 0x4B, 0x05, 0x06];
+    const PK_SPANNED_ARCHIVE: [u8; 4] = [0x50, 0x4B, 0x07, 0x08];
+
+    bytes.starts_with(&PK_LOCAL_FILE_HEADER)
+        || bytes.starts_with(&PK_EMPTY_ARCHIVE)
+        || bytes.starts_with(&PK_SPANNED_ARCHIVE)
+}
+
 pub struct DownloadLunaStep {
     pub download_url: String,
 }
@@ -57,6 +67,27 @@ impl InstallStep for DownloadLunaStep {
                 };
             }
         };
+
+        if bytes.is_empty() {
+            return StepResult {
+                success: false,
+                message: "Download completed but returned an empty file".into(),
+            };
+        }
+
+        if !has_zip_signature(&bytes) {
+            let preview = String::from_utf8_lossy(&bytes[..bytes.len().min(180)])
+                .replace('\n', " ")
+                .replace('\r', " ");
+
+            return StepResult {
+                success: false,
+                message: format!(
+                    "Downloaded file is not a valid ZIP archive. URL: {}. Response preview: {}",
+                    self.download_url, preview
+                ),
+            };
+        }
 
         match File::create(&zip_path).await {
             Ok(mut file) => {
