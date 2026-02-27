@@ -63,7 +63,7 @@ jobs:
           major=$(echo $version | cut -d. -f1)
           minor=$(echo $version | cut -d. -f2)
           patch=$(echo $version | cut -d. -f3)
-          
+
           # Increment patch version
           patch=$((patch + 1))
           new_version="v$major.$minor.$patch"
@@ -87,7 +87,7 @@ jobs:
           $major = [int]$parts[0]
           $minor = [int]$parts[1]
           $patch = [int]$parts[2]
-          
+
           # Increment patch version
           $patch = $patch + 1
           $new_version = "v$major.$minor.$patch"
@@ -182,7 +182,7 @@ jobs:
           major=$(echo $version | cut -d. -f1)
           minor=$(echo $version | cut -d. -f2)
           patch=$(echo $version | cut -d. -f3)
-          
+
           # Increment patch version
           patch=$((patch + 1))
           new_version="v$major.$minor.$patch"
@@ -194,7 +194,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts/
-          pattern: '*'
+          pattern: "*"
           merge-multiple: true
 
       - name: Create GitHub Release

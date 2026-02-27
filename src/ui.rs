@@ -3,112 +3,24 @@ use iced::{
     Settings, Shadow, Size, Subscription, Theme, Vector,
 };
 use iced::widget::{
-    button, checkbox, combo_box, horizontal_space, progress_bar, scrollable, text, text_input,
+    button, checkbox, combo_box, horizontal_space, image, progress_bar, scrollable, text,
+    text_input, tooltip,
     Column, Container, Row, Scrollable,
 };
-use serde::{Deserialize, Serialize};
+use iced::widget::tooltip::Position;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::runtime::Runtime;
-
-use crate::installer::{
-    steps::{
-        copy_asar_install::CopyAsarInstallStep, copy_asar_uninstall::CopyAsarUninstallStep,
-        download_luna::DownloadLunaStep, extract_luna::ExtractLunaStep,
-        insert_luna::InsertLunaStep, kill_tidal::KillTidalStep, setup::SetupStep,
-        sign_tidal::SignTidalStep, launch_tidal::LaunchTidalStep, reinstall_cleanup::ReinstallCleanupStep, uninstall::UninstallStep,
-    },
-    manager::InstallManager,
-};
-use crate::utils::{
-    fs_helpers::{find_tidal_directories, is_luna_installed, normalize_tidal_resources_path},
-    release_loader::ReleaseLoader,
-};
 use semver::Version;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+mod models;
+mod tasks;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppRelease {
-    pub name: String,
-    pub versions: Vec<AppVersionInfo>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppVersionInfo {
-    pub version: String,
-    pub download: String,
-}
-
-
-#[derive(Debug, Clone)]
-pub enum Message {
-    LoadReleases,
-    ReleasesLoaded(Result<Vec<AppRelease>, String>),
-    ReleaseChannelSelected(String),
-    VersionSelected(String),
-    InstallPathChanged(String),
-    InstallPathOptionSelected(String),
-    TidalPathsDetected(Result<Vec<String>, String>),
-    Install,
-    Uninstall,
-    InstallationComplete(Result<InstallExecutionResult, String>),
-    InstallationStatus(bool),
-    ToggleAdvancedOptions(bool),
-    ClearLog,
-}
-
-#[derive(Debug, Clone)]
-pub struct InstallExecutionLog {
-    message: String,
-    is_substep: bool,
-}
-
-#[derive(Debug, Clone)]
-pub struct InstallExecutionResult {
-    logs: Vec<InstallExecutionLog>,
-    success: bool,
-}
-
-
-#[derive(Debug, Clone)]
-pub struct MyApp {
-    releases: Vec<AppRelease>,
-    selected_channel: String,
-    selected_version: String,
-    selected_install_path: String,
-    custom_install_path: String,
-    is_loading: bool,
-    is_installing: bool,
-    is_uninstalling: bool,
-    is_advanced_open: bool,
-    is_luna_installed: bool,
-
-    channel_pick_list: combo_box::State<String>,
-    version_pick_list: combo_box::State<String>,
-    install_path_pick_list: combo_box::State<String>,
-    install_path_options: Vec<String>,
-
-    log_entries: Vec<LogEntry>,
-    
-    runtime: Arc<Runtime>,
-}
-
-#[derive(Debug, Clone)]
-struct LogEntry {
-    timestamp: u64,
-    message: String,
-    level: LogLevel,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LogLevel {
-    Info,
-    Success,
-    Error,
-    Step,
-    SubStep,
-}
+use models::{LogEntry, LogLevel, Message, MyApp};
+use tasks::{
+    check_installation_async, detect_tidal_paths_async, install_async, load_releases_async,
+    load_stargazers_async, uninstall_async,
+};
 
 impl Default for MyApp {
     fn default() -> Self {
@@ -127,10 +39,14 @@ impl Default for MyApp {
             is_uninstalling: false,
             is_advanced_open: false,
             is_luna_installed: false,
+            is_loading_stargazers: true,
             channel_pick_list,
             version_pick_list,
             install_path_pick_list,
             install_path_options: Vec::new(),
+            stargazers: Vec::new(),
+            stargazers_error: None,
+            stargazers_page: 0,
             log_entries: Vec::new(),
             runtime: Arc::new(
                 Runtime::new().unwrap_or_else(|e| {
@@ -156,12 +72,14 @@ impl Application for MyApp {
             Message::InstallationStatus(is_installed)
         });
         let detect_paths = Command::perform(detect_tidal_paths_async(app.runtime.clone()), Message::TidalPathsDetected);
+        let load_stargazers = Command::perform(load_stargazers_async(app.runtime.clone()), Message::StargazersLoaded);
 
         let cmd = Command::batch(vec![
             Command::perform(async {}, |_| Message::LoadReleases),
             load_releases,
             check_installation,
             detect_paths,
+            load_stargazers,
         ]);
 
         (app, cmd)
@@ -212,6 +130,26 @@ impl Application for MyApp {
                         );
                     }
                 }
+                Command::none()
+            }
+
+            Message::StargazersLoaded(result) => {
+                self.is_loading_stargazers = false;
+
+                match result {
+                    Ok(stargazers) => {
+                        self.stargazers = stargazers;
+                        self.stargazers_error = None;
+                        self.stargazers_page = 0;
+                    }
+                    Err(err) => {
+                        self.stargazers.clear();
+                        self.stargazers_error = Some(err.clone());
+                        self.stargazers_page = 0;
+                        self.add_log(&format!("Failed to load stargazers: {}", err), LogLevel::Info);
+                    }
+                }
+
                 Command::none()
             }
 
@@ -368,6 +306,21 @@ impl Application for MyApp {
 
             Message::ToggleAdvancedOptions(is_open) => {
                 self.is_advanced_open = is_open;
+                Command::none()
+            }
+
+            Message::PrevStargazersPage => {
+                if self.stargazers_page > 0 {
+                    self.stargazers_page -= 1;
+                }
+                Command::none()
+            }
+
+            Message::NextStargazersPage => {
+                let total_pages = self.stargazer_total_pages();
+                if self.stargazers_page + 1 < total_pages {
+                    self.stargazers_page += 1;
+                }
                 Command::none()
             }
 
@@ -808,7 +761,8 @@ impl Application for MyApp {
             .width(Length::Fill)
             .push(header_box)
             .push(legal_warning)
-            .push(main_box);
+            .push(main_box)
+            .push(self.view_stargazers());
 
         Container::new(
             Scrollable::new(Container::new(content).width(Length::Fill).center_x()),
@@ -831,6 +785,8 @@ impl Application for MyApp {
 
 
 impl MyApp {
+    const STARGAZERS_PER_PAGE: usize = 28;
+
     fn add_log(&mut self, message: &str, level: LogLevel) {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -852,259 +808,149 @@ impl MyApp {
         self.log_entries.clear();
         self.add_log("Log cleared", LogLevel::Info);
     }
-}
 
+    fn stargazer_total_pages(&self) -> usize {
+        if self.stargazers.is_empty() {
+            1
+        } else {
+            self.stargazers.len().div_ceil(Self::STARGAZERS_PER_PAGE)
+        }
+    }
 
-async fn load_releases_async(runtime: Arc<Runtime>) -> Result<Vec<AppRelease>, String> {
-    let result = runtime.spawn(async move {
-        let mut loader = ReleaseLoader::new(
-            "https://raw.githubusercontent.com/jxnxsdev/TidaLuna-Installer/main/resources/sources.json",
-        );
+    fn view_stargazers(&self) -> Element<'_, Message> {
+        let card_style = |_: &Theme| iced::widget::container::Appearance {
+            text_color: None,
+            background: Some(Background::Color(Color::from_rgba(0.11, 0.12, 0.16, 0.94))),
+            border: Border {
+                radius: 8.0.into(),
+                width: 1.0,
+                color: Color::from_rgba(0.45, 0.55, 0.9, 0.18),
+            },
+            shadow: Shadow {
+                color: Color::from_rgba(0.0, 0.0, 0.0, 0.45),
+                offset: Vector::new(0.0, 8.0),
+                blur_radius: 18.0,
+            },
+        };
 
-        match loader.load_releases().await {
-            Ok(releases) => {
-                let app_releases = releases
-                    .into_iter()
-                    .map(|release| AppRelease {
-                        name: release.name.clone(),
-                        versions: release
-                            .versions
-                            .iter()
-                            .map(|version| AppVersionInfo {
-                                version: version.version.clone(),
-                                download: version.download.clone(),
-                            })
-                            .collect(),
-                    })
-                    .collect();
-                Ok(app_releases)
+        let title = text("Stargazers <3")
+            .size(16)
+            .style(iced::theme::Text::Color(Color::from_rgb(0.80, 0.83, 0.90)));
+
+        let subtitle = text("Thanks to everyone who starred this project.")
+            .size(12)
+            .style(iced::theme::Text::Color(Color::from_rgb(0.65, 0.68, 0.75)));
+
+        let section_body: Element<'_, Message> = if self.is_loading_stargazers {
+            text("Loading stargazers...")
+                .size(13)
+                .style(iced::theme::Text::Color(Color::from_rgb(0.72, 0.74, 0.8)))
+                .into()
+        } else if let Some(err) = &self.stargazers_error {
+            text(format!("Could not load stargazers: {}", err))
+                .size(13)
+                .style(iced::theme::Text::Color(Color::from_rgb(0.78, 0.44, 0.44)))
+                .into()
+        } else if self.stargazers.is_empty() {
+            text("No stargazers found yet.")
+                .size(13)
+                .style(iced::theme::Text::Color(Color::from_rgb(0.72, 0.74, 0.8)))
+                .into()
+        } else {
+            let per_row = 14;
+            let total_pages = self.stargazer_total_pages();
+            let page = self.stargazers_page.min(total_pages.saturating_sub(1));
+            let start = page * Self::STARGAZERS_PER_PAGE;
+            let end = (start + Self::STARGAZERS_PER_PAGE).min(self.stargazers.len());
+
+            let mut grid = Column::new().spacing(8);
+
+            for chunk in self.stargazers[start..end].chunks(per_row) {
+                let row = chunk.iter().fold(Row::new().spacing(8), |row, stargazer| {
+                    let avatar = Container::new(
+                        image(stargazer.avatar.clone())
+                            .width(Length::Fixed(36.0))
+                            .height(Length::Fixed(36.0)),
+                    )
+                    .width(Length::Fixed(38.0))
+                    .height(Length::Fixed(38.0));
+
+                    row.push(
+                        tooltip(
+                            avatar,
+                            text(stargazer.tooltip_text.clone()).size(12),
+                            Position::Top,
+                        )
+                        .padding(8),
+                    )
+                });
+
+                grid = grid.push(row);
             }
-            Err(e) => Err(format!("Failed to load releases: {}", e)),
-        }
-    }).await;
 
-    match result {
-        Ok(inner_result) => inner_result,
-        Err(_) => Err("Failed to load releases: task cancelled".to_string()),
-    }
-}
+            let prev_button = if page > 0 {
+                button(text("Previous").size(12))
+                    .on_press(Message::PrevStargazersPage)
+                    .padding([6, 10])
+            } else {
+                button(
+                    text("Previous")
+                        .size(12)
+                        .style(iced::theme::Text::Color(Color::from_rgb(0.5, 0.5, 0.5))),
+                )
+                .padding([6, 10])
+            };
 
-async fn check_installation_async(runtime: Arc<Runtime>) -> bool {
-    let result = runtime.spawn(async move {
-        is_luna_installed().await.unwrap_or(false)
-    }).await;
+            let next_button = if page + 1 < total_pages {
+                button(text("Next").size(12))
+                    .on_press(Message::NextStargazersPage)
+                    .padding([6, 10])
+            } else {
+                button(
+                    text("Next")
+                        .size(12)
+                        .style(iced::theme::Text::Color(Color::from_rgb(0.5, 0.5, 0.5))),
+                )
+                .padding([6, 10])
+            };
 
-    result.unwrap_or(false)
-}
-
-async fn detect_tidal_paths_async(runtime: Arc<Runtime>) -> Result<Vec<String>, String> {
-    let result = runtime
-        .spawn(async move {
-            find_tidal_directories()
-                .await
-                .map(|paths| paths.into_iter().map(|p| p.to_string_lossy().to_string()).collect())
-        })
-        .await;
-
-    match result {
-        Ok(Ok(paths)) => Ok(paths),
-        Ok(Err(err)) => Err(err.to_string()),
-        Err(_) => Err("Failed to detect TIDAL paths: task cancelled".to_string()),
-    }
-}
-
-async fn install_async(
-    releases: Vec<AppRelease>,
-    channel: String,
-    version: String,
-    selected_path: String,
-    custom_path: String,
-    reinstall_mode: bool,
-    runtime: Arc<Runtime>,
-) -> Result<InstallExecutionResult, String> {
-    let result = runtime.spawn(async move {
-        let selected_release = releases
-            .iter()
-            .find(|r| r.name == channel)
-            .ok_or_else(|| format!("Release channel '{}' not found", channel))?;
-
-        let selected_version = selected_release
-            .versions
-            .iter()
-            .find(|v| v.version == version)
-            .ok_or_else(|| format!("Version '{}' not found in channel '{}'", version, channel))?;
-
-        let final_path = if !custom_path.trim().is_empty() {
-            normalize_tidal_resources_path(PathBuf::from(custom_path))
-        } else if !selected_path.trim().is_empty() {
-            normalize_tidal_resources_path(PathBuf::from(selected_path))
-        } else {
-            return Err("No TIDAL path selected".to_string());
+            Column::new()
+                .spacing(10)
+                .push(Container::new(grid).width(Length::Fill))
+                .push(
+                    Row::new()
+                        .spacing(10)
+                        .align_items(Alignment::Center)
+                        .push(prev_button)
+                        .push(next_button)
+                        .push(horizontal_space())
+                        .push(
+                            text(format!(
+                                "Showing {}-{} of {} • Page {}/{}",
+                                start + 1,
+                                end,
+                                self.stargazers.len(),
+                                page + 1,
+                                total_pages
+                            ))
+                            .size(12)
+                            .style(iced::theme::Text::Color(Color::from_rgb(0.65, 0.68, 0.75))),
+                        ),
+                )
+                .into()
         };
 
-        let mut manager = InstallManager::new();
-        let collected_logs = Arc::new(Mutex::new(Vec::<InstallExecutionLog>::new()));
-        let install_success = Arc::new(Mutex::new(true));
-
-        manager.add_step(Box::new(KillTidalStep));
-        if reinstall_mode {
-            manager.add_step(Box::new(ReinstallCleanupStep {
-                overwrite_path: Some(final_path.clone()),
-            }));
-        }
-        manager.add_step(Box::new(SetupStep {
-            overwrite_path: Some(final_path.clone()),
-        }));
-        manager.add_step(Box::new(DownloadLunaStep {
-            download_url: selected_version.download.clone(),
-        }));
-        manager.add_step(Box::new(ExtractLunaStep));
-        manager.add_step(Box::new(CopyAsarInstallStep {
-            overwrite_path: Some(final_path.clone()),
-        }));
-        manager.add_step(Box::new(InsertLunaStep {
-            overwrite_path: Some(final_path.clone()),
-        }));
-        manager.add_step(Box::new(SignTidalStep));
-        manager.add_step(Box::new(LaunchTidalStep {
-            overwrite_path: Some(final_path.clone()),
-            suppress_console_window: true,
-        }));
-
-        let logs_for_sub = Arc::clone(&collected_logs);
-        let logs_for_step = Arc::clone(&collected_logs);
-        let logs_for_start = Arc::clone(&collected_logs);
-        let success_for_end = Arc::clone(&install_success);
-
-        manager
-            .run(
-                |sublog| {
-                    if let Ok(mut logs) = logs_for_sub.lock() {
-                        logs.push(InstallExecutionLog {
-                            message: sublog,
-                            is_substep: true,
-                        });
-                    }
-                },
-                |steplog| {
-                    if let Ok(mut logs) = logs_for_step.lock() {
-                        logs.push(InstallExecutionLog {
-                            message: steplog,
-                            is_substep: false,
-                        });
-                    }
-                },
-                |step_name| {
-                    if let Ok(mut logs) = logs_for_start.lock() {
-                        logs.push(InstallExecutionLog {
-                            message: format!("=== {} ===", step_name),
-                            is_substep: false,
-                        });
-                    }
-                },
-                |success| {
-                    if !success {
-                        if let Ok(mut flag) = success_for_end.lock() {
-                            *flag = false;
-                        }
-                    }
-                },
-            )
-            .await;
-
-        let logs = collected_logs.lock().map(|logs| logs.clone()).unwrap_or_default();
-        let success = install_success.lock().map(|flag| *flag).unwrap_or(false);
-
-        Ok(InstallExecutionResult { logs, success })
-    }).await;
-
-    match result {
-        Ok(inner_result) => inner_result,
-        Err(_) => Err("Installation task cancelled".to_string()),
-    }
-}
-
-async fn uninstall_async(
-    selected_path: String,
-    custom_path: String,
-    runtime: Arc<Runtime>,
-) -> Result<InstallExecutionResult, String> {
-    let result = runtime.spawn(async move {
-        let final_path = if !custom_path.trim().is_empty() {
-            normalize_tidal_resources_path(PathBuf::from(custom_path))
-        } else if !selected_path.trim().is_empty() {
-            normalize_tidal_resources_path(PathBuf::from(selected_path))
-        } else {
-            return Err("No TIDAL path selected".to_string());
-        };
-
-        let mut manager = InstallManager::new();
-        let collected_logs = Arc::new(Mutex::new(Vec::<InstallExecutionLog>::new()));
-        let uninstall_success = Arc::new(Mutex::new(true));
-
-        manager.add_step(Box::new(KillTidalStep));
-        manager.add_step(Box::new(CopyAsarUninstallStep {
-            overwrite_path: Some(final_path.clone()),
-        }));
-        manager.add_step(Box::new(UninstallStep {
-            overwrite_path: Some(final_path.clone()),
-        }));
-        manager.add_step(Box::new(SignTidalStep));
-        manager.add_step(Box::new(LaunchTidalStep {
-            overwrite_path: Some(final_path.clone()),
-            suppress_console_window: true,
-        }));
-
-        let logs_for_sub = Arc::clone(&collected_logs);
-        let logs_for_step = Arc::clone(&collected_logs);
-        let logs_for_start = Arc::clone(&collected_logs);
-        let success_for_end = Arc::clone(&uninstall_success);
-
-        manager
-            .run(
-                |sublog| {
-                    if let Ok(mut logs) = logs_for_sub.lock() {
-                        logs.push(InstallExecutionLog {
-                            message: sublog,
-                            is_substep: true,
-                        });
-                    }
-                },
-                |steplog| {
-                    if let Ok(mut logs) = logs_for_step.lock() {
-                        logs.push(InstallExecutionLog {
-                            message: steplog,
-                            is_substep: false,
-                        });
-                    }
-                },
-                |step_name| {
-                    if let Ok(mut logs) = logs_for_start.lock() {
-                        logs.push(InstallExecutionLog {
-                            message: format!("=== {} ===", step_name),
-                            is_substep: false,
-                        });
-                    }
-                },
-                |success| {
-                    if !success {
-                        if let Ok(mut flag) = success_for_end.lock() {
-                            *flag = false;
-                        }
-                    }
-                },
-            )
-            .await;
-
-        let logs = collected_logs.lock().map(|logs| logs.clone()).unwrap_or_default();
-        let success = uninstall_success.lock().map(|flag| *flag).unwrap_or(false);
-
-        Ok(InstallExecutionResult { logs, success })
-    }).await;
-
-    match result {
-        Ok(inner_result) => inner_result,
-        Err(_) => Err("Uninstallation task cancelled".to_string()),
+        Container::new(
+            Column::new()
+                .spacing(8)
+                .push(title)
+                .push(subtitle)
+                .push(section_body),
+        )
+        .padding(14)
+        .width(Length::Fill)
+        .style(card_style)
+        .into()
     }
 }
 

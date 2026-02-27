@@ -12,12 +12,18 @@ fn main() {
     let args = Args::parse();
 
     if args.headless {
-        tokio::runtime::Builder::new_current_thread()
+        match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .unwrap()
-            .block_on(cli::run_cli(args));
+        {
+            Ok(runtime) => runtime.block_on(cli::run_cli(args)),
+            Err(err) => {
+                eprintln!("Failed to initialize async runtime: {}", err);
+            }
+        }
     } else {
-        ui::run_gui().unwrap();
+        if let Err(err) = ui::run_gui() {
+            eprintln!("Failed to launch GUI: {}", err);
+        }
     }
 }

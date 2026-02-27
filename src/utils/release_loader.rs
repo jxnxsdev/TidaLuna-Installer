@@ -56,8 +56,12 @@ impl ReleaseLoader {
             return "stable".to_string();
         }
 
-        if let Some(caps) = regex::Regex::new(r"^([a-zA-Z]+)[-_]\d").unwrap().captures(clean) {
-            return caps.get(1).unwrap().as_str().to_string();
+        if let Ok(regex) = regex::Regex::new(r"^([a-zA-Z]+)[-_]\d") {
+            if let Some(caps) = regex.captures(clean) {
+                if let Some(channel) = caps.get(1) {
+                    return channel.as_str().to_string();
+                }
+            }
         }
 
         clean.to_string()
