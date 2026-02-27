@@ -1,3 +1,4 @@
+use semver::Version;
 use std::path::{Path, PathBuf};
 use tokio::io;
 use std::env;
@@ -12,8 +13,32 @@ fn first_existing_path(paths: &[PathBuf]) -> Option<PathBuf> {
     paths.iter().find(|p| p.exists()).cloned()
 }
 
-fn find_resources_in_app_versions(base_dir: &Path) -> Option<PathBuf> {
-    let entries = std::fs::read_dir(base_dir).ok()?;
+fn resolve_resources_dir(base_dir: &Path) -> Option<PathBuf> {
+    let resources = base_dir.join("resources");
+    if is_tidal_resources_directory(&resources) {
+        return Some(resources);
+    }
+
+    let resources_alt = base_dir.join("Resources");
+    if is_tidal_resources_directory(&resources_alt) {
+        return Some(resources_alt);
+    }
+
+    None
+}
+
+fn parse_app_dir_version(app_dir_name: &str) -> Option<Version> {
+    app_dir_name
+        .strip_prefix("app-")
+        .and_then(|version| Version::parse(version).ok())
+}
+
+fn collect_resources_in_app_versions(base_dir: &Path) -> Vec<PathBuf> {
+    let entries = match std::fs::read_dir(base_dir) {
+        Ok(entries) => entries,
+        Err(_) => return Vec::new(),
+    };
+
     let mut app_dirs: Vec<String> = entries
         .filter_map(Result::ok)
         .filter_map(|entry| {
@@ -22,31 +47,40 @@ fn find_resources_in_app_versions(base_dir: &Path) -> Option<PathBuf> {
                 return None;
             }
 
-            let resources = entry.path().join("resources");
-            let resources_alt = entry.path().join("Resources");
-            if is_tidal_resources_directory(&resources) || is_tidal_resources_directory(&resources_alt) {
-                Some(name)
-            } else {
-                None
-            }
+            resolve_resources_dir(&entry.path()).map(|_| name)
         })
         .collect();
 
-    app_dirs.sort();
+    app_dirs.sort_by(|left, right| {
+        let left_ver = parse_app_dir_version(left);
+        let right_ver = parse_app_dir_version(right);
 
-    app_dirs.last().and_then(|latest| {
-        let resources = base_dir.join(latest).join("resources");
-        if is_tidal_resources_directory(&resources) {
-            return Some(resources);
+        match (left_ver, right_ver) {
+            (Some(left_ver), Some(right_ver)) => right_ver.cmp(&left_ver),
+            _ => right.cmp(left),
         }
+    });
 
-        let resources_alt = base_dir.join(latest).join("Resources");
-        if is_tidal_resources_directory(&resources_alt) {
-            return Some(resources_alt);
+    app_dirs
+        .into_iter()
+        .filter_map(|dir_name| resolve_resources_dir(&base_dir.join(dir_name)))
+        .collect()
+}
+
+fn find_resources_in_app_versions(base_dir: &Path) -> Option<PathBuf> {
+    collect_resources_in_app_versions(base_dir).into_iter().next()
+}
+
+fn dedup_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut deduped = Vec::new();
+
+    for path in paths {
+        if !deduped.iter().any(|existing| existing == &path) {
+            deduped.push(path);
         }
+    }
 
-        None
-    })
+    deduped
 }
 
 pub fn normalize_tidal_resources_path(input: PathBuf) -> PathBuf {
@@ -104,48 +138,82 @@ pub fn has_tidal_app_asar(path: &Path) -> bool {
 
 /// Get the TIDAL resources directory based on OS
 pub async fn get_tidal_directory() -> io::Result<PathBuf> {
+    let candidates = find_tidal_directories().await?;
+    if let Some(path) = candidates.first() {
+        return Ok(path.clone());
+    }
+
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        "TIDAL resources directory not found",
+    ))
+}
+
+pub async fn find_tidal_directories() -> io::Result<Vec<PathBuf>> {
     let platform = std::env::consts::OS;
 
     match platform {
         "windows" => {
+            let mut matches = Vec::new();
             if let Some(local_appdata) = env::var_os("LOCALAPPDATA") {
                 let tidal_dir = Path::new(&local_appdata).join("TIDAL");
                 if tidal_dir.exists() {
-                    if let Some(resources_path) = find_resources_in_app_versions(&tidal_dir) {
-                        return Ok(resources_path);
-                    }
+                    matches.extend(collect_resources_in_app_versions(&tidal_dir));
                 }
             }
-            Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "TIDAL resources directory not found on Windows",
-            ))
+
+            let matches = dedup_paths(matches);
+            if matches.is_empty() {
+                Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "TIDAL resources directory not found on Windows",
+                ))
+            } else {
+                Ok(matches)
+            }
         }
         "macos" => {
-            let mut candidates = vec![PathBuf::from("/Applications/TIDAL.app")];
+            let mut candidates = vec![
+                PathBuf::from("/Applications/TIDAL.app"),
+                PathBuf::from("/Applications/Tidal.app"),
+                PathBuf::from("/Applications/tidal.app"),
+            ];
             if let Some(home) = dirs::home_dir() {
                 candidates.push(home.join("Applications").join("TIDAL.app"));
                 candidates.push(home.join("Applications").join("Tidal.app"));
+                candidates.push(home.join("Applications").join("tidal.app"));
             }
 
+            let mut matches = Vec::new();
             for app_bundle in candidates {
                 let resources = normalize_tidal_resources_path(app_bundle);
                 if is_tidal_resources_directory(&resources) {
-                    return Ok(resources);
+                    matches.push(resources);
                 }
             }
 
-            Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "TIDAL resources directory not found on macOS",
-            ))
+            let matches = dedup_paths(matches);
+            if matches.is_empty() {
+                Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "TIDAL resources directory not found on macOS",
+                ))
+            } else {
+                Ok(matches)
+            }
         }
         "linux" => {
             let mut paths = vec![
                 PathBuf::from("/var/lib/flatpak/app/com.mastermindzh.tidal-hifi/current/active/files/lib/tidal-hifi/resources"),
+                PathBuf::from("/var/lib/flatpak/app/com.mastermindzh.tidal-hifi/x86_64/stable/active/files/lib/tidal-hifi/resources"),
+                PathBuf::from("/var/lib/flatpak/app/com.mastermindzh.tidal-hifi/x86_64/beta/active/files/lib/tidal-hifi/resources"),
                 PathBuf::from("/opt/tidal-hifi/resources"),
+                PathBuf::from("/opt/TIDAL/resources"),
                 PathBuf::from("/usr/lib/tidal-hifi/resources"),
+                PathBuf::from("/usr/lib/TIDAL/resources"),
                 PathBuf::from("/usr/share/tidal-hifi/resources"),
+                PathBuf::from("/usr/share/TIDAL/resources"),
+                PathBuf::from("/app/extra/tidal-hifi/resources"),
             ];
 
             if let Some(home) = dirs::home_dir() {
@@ -162,18 +230,52 @@ pub async fn get_tidal_directory() -> io::Result<PathBuf> {
                         .join("tidal-hifi")
                         .join("resources"),
                 );
+                paths.push(
+                    home.join(".local")
+                        .join("share")
+                        .join("flatpak")
+                        .join("app")
+                        .join("com.mastermindzh.tidal-hifi")
+                        .join("x86_64")
+                        .join("stable")
+                        .join("active")
+                        .join("files")
+                        .join("lib")
+                        .join("tidal-hifi")
+                        .join("resources"),
+                );
+                paths.push(
+                    home.join(".local")
+                        .join("share")
+                        .join("flatpak")
+                        .join("app")
+                        .join("com.mastermindzh.tidal-hifi")
+                        .join("x86_64")
+                        .join("beta")
+                        .join("active")
+                        .join("files")
+                        .join("lib")
+                        .join("tidal-hifi")
+                        .join("resources"),
+                );
             }
 
+            let mut matches = Vec::new();
             for p in paths {
                 if is_tidal_resources_directory(&p) {
-                    return Ok(p);
+                    matches.push(p);
                 }
             }
 
-            Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "TIDAL resources directory not found on Linux",
-            ))
+            let matches = dedup_paths(matches);
+            if matches.is_empty() {
+                Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "TIDAL resources directory not found on Linux",
+                ))
+            } else {
+                Ok(matches)
+            }
         }
         _ => Err(io::Error::new(
             io::ErrorKind::Unsupported,
@@ -184,13 +286,12 @@ pub async fn get_tidal_directory() -> io::Result<PathBuf> {
 
 /// Check if Luna is installed
 pub async fn is_luna_installed() -> io::Result<bool> {
-    let tidal_dir = match get_tidal_directory().await {
-        Ok(path) => path,
+    let tidal_dirs = match find_tidal_directories().await {
+        Ok(paths) => paths,
         Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(false),
         Err(err) => return Err(err),
     };
 
-    let app_dir = tidal_dir.join("app");
-    Ok(app_dir.exists())
+    Ok(tidal_dirs.iter().any(|path| path.join("app").exists()))
 }
 

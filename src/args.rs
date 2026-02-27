@@ -12,6 +12,10 @@ pub struct Args {
     #[arg(short, long)]
     pub install: bool,
 
+    /// Reinstall action (tries uninstall first, then installs)
+    #[arg(long)]
+    pub reinstall: bool,
+
     /// Uninstall action
     #[arg(short, long)]
     pub uninstall: bool,
