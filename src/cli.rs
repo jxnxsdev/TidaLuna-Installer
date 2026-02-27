@@ -2,6 +2,7 @@ use crate::args::Args;
 use crate::utils::{
     release_loader::ReleaseLoader,
     fs_helpers::{find_tidal_directories, is_luna_installed, normalize_tidal_resources_path},
+    updater,
 };
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -81,6 +82,46 @@ async fn resolve_cli_tidal_path(user_path: &Option<String>) -> io::Result<PathBu
 
 pub async fn run_cli(args: Args) {
     println!("TidaLuna Installer CLI\n");
+
+    let current_version = env!("CARGO_PKG_VERSION");
+    let available_update = match updater::check_for_update(current_version).await {
+        Ok(update) => update,
+        Err(error) => {
+            eprintln!("Installer update check failed: {}", error);
+            None
+        }
+    };
+
+    if let Some(update) = &available_update {
+        println!(
+            "Installer update available: v{} -> v{}",
+            current_version, update.version
+        );
+        println!("Do you want to update? Run with --headless --update\n");
+    }
+
+    if args.update {
+        match available_update {
+            Some(update) => {
+                println!("Applying installer update to v{}...", update.version);
+                match updater::apply_update(&update.download_url, false).await {
+                    Ok(result) => {
+                        println!("{}", result.message);
+                        if result.should_exit {
+                            return;
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!("Failed to apply installer update: {}", error);
+                    }
+                }
+            }
+            None => {
+                println!("Installer is already up to date (v{}).", current_version);
+            }
+        }
+        return;
+    }
 
     // Initialize release loader
     let mut loader = ReleaseLoader::new(

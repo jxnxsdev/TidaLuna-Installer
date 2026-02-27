@@ -31,4 +31,8 @@ pub struct Args {
     /// List available versions
     #[arg(short = 'l', long)]
     pub list_versions: bool,
+
+    /// Update the installer binary to the latest release
+    #[arg(long)]
+    pub update: bool,
 }

@@ -18,9 +18,41 @@ use crate::installer::{
 use crate::utils::{
     fs_helpers::{find_tidal_directories, is_luna_installed, normalize_tidal_resources_path},
     release_loader::ReleaseLoader,
+    updater,
 };
 
-use super::models::{AppRelease, AppVersionInfo, InstallExecutionLog, InstallExecutionResult, Stargazer};
+use super::models::{
+    AppRelease, AppVersionInfo, InstallExecutionLog, InstallExecutionResult,
+    InstallerUpdateApplyResult, InstallerUpdateInfo, Stargazer,
+};
+
+pub async fn check_installer_update_async(
+    runtime: Arc<Runtime>,
+    current_version: String,
+) -> Result<Option<InstallerUpdateInfo>, String> {
+    let result = runtime
+        .spawn(async move { updater::check_for_update(&current_version).await })
+        .await;
+
+    match result {
+        Ok(inner) => inner,
+        Err(_) => Err("Failed to check for installer updates: task cancelled".to_string()),
+    }
+}
+
+pub async fn apply_installer_update_async(
+    runtime: Arc<Runtime>,
+    download_url: String,
+) -> Result<InstallerUpdateApplyResult, String> {
+    let result = runtime
+        .spawn(async move { updater::apply_update(&download_url, true).await })
+        .await;
+
+    match result {
+        Ok(inner) => inner,
+        Err(_) => Err("Failed to apply installer update: task cancelled".to_string()),
+    }
+}
 
 #[derive(Debug, Deserialize)]
 struct GitHubStargazer {
