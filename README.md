@@ -86,9 +86,19 @@ Precompiled binaries are available on the GitHub Releases page:
 Select the build that matches your operating system and architecture:
 
 - **Windows**: `installer-windows-x86_64-vX.X.X.exe`
-- **Linux**: `installer-linux-x86_64-vX.X.X`
-- **macOS (Intel)**: `installer-macOS-x86_64-vX.X.X`
-- **macOS (Apple Silicon)**: `installer-macOS-aarch64-vX.X.X`
+- **Linux (double-click install)**: `installer-linux-x86_64-vX.X.X.deb`
+- **Linux (portable AppImage)**: `installer-linux-x86_64-vX.X.X.AppImage`
+- **Linux (portable binary)**: `installer-linux-x86_64-vX.X.X`
+- **macOS (Intel, app bundle)**: `installer-macOS-x86_64-vX.X.X.app.zip`
+- **macOS (Apple Silicon, app bundle)**: `installer-macOS-aarch64-vX.X.X.app.zip`
+- **macOS (raw binary)**: `installer-macOS-<arch>-vX.X.X`
+
+### GUI Launch Notes
+
+- On **macOS**, extract the `.app.zip` and double-click the `.app`.
+- On **Linux**, double-click the `.deb` to install, then launch **TidaLuna Installer** from your app menu.
+- On **Linux**, you can also use the `.AppImage` directly (may require `chmod +x` once depending on your desktop/browser).
+- Linux portable binaries may still require `chmod +x` if your desktop/browser strips executable permission on download.
 
 ## Command Line Interface (CLI) Usage
 
