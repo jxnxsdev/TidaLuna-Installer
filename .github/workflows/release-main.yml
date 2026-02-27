@@ -109,9 +109,112 @@ jobs:
       - name: Build for Linux
         if: matrix.platform.os-name == 'linux-x86_64'
         run: |
+          set -euo pipefail
           cargo build --release --target ${{ matrix.platform.rust-target }}
-          mv target/${{ matrix.platform.rust-target }}/release/tidaluna-installer ./installer-linux-x86_64-${{ steps.get_version.outputs.new_tag }}
-          chmod +x ./installer-linux-x86_64-${{ steps.get_version.outputs.new_tag }}
+          TAG="${{ steps.get_version.outputs.new_tag }}"
+          VERSION="${TAG#v}"
+
+          mv target/${{ matrix.platform.rust-target }}/release/tidaluna-installer ./installer-linux-x86_64-${TAG}
+          chmod +x ./installer-linux-x86_64-${TAG}
+
+          mkdir -p debpkg/DEBIAN
+          mkdir -p debpkg/opt/tidaluna-installer
+          mkdir -p debpkg/usr/bin
+          mkdir -p debpkg/usr/share/applications
+
+          cat > debpkg/DEBIAN/control <<EOF
+          Package: tidaluna-installer
+          Version: ${VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: TidaLuna Installer Team
+          Description: GUI installer for TidaLuna
+          EOF
+
+          cp ./installer-linux-x86_64-${TAG} debpkg/opt/tidaluna-installer/tidaluna-installer
+          chmod +x debpkg/opt/tidaluna-installer/tidaluna-installer
+
+          cat > debpkg/usr/bin/tidaluna-installer <<'EOF'
+          #!/usr/bin/env bash
+          exec /opt/tidaluna-installer/tidaluna-installer "$@"
+          EOF
+          chmod +x debpkg/usr/bin/tidaluna-installer
+
+          cat > debpkg/usr/share/applications/tidaluna-installer.desktop <<'EOF'
+          [Desktop Entry]
+          Name=TidaLuna Installer
+          Comment=Install or remove TidaLuna from TIDAL
+          Exec=/usr/bin/tidaluna-installer
+          Terminal=false
+          Type=Application
+          Categories=Utility;
+          StartupNotify=true
+          EOF
+
+          dpkg-deb --build debpkg ./installer-linux-x86_64-${TAG}.deb
+
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+
+          cp ./installer-linux-x86_64-${TAG} AppDir/usr/bin/tidaluna-installer
+          chmod +x AppDir/usr/bin/tidaluna-installer
+
+          cat > AppDir/AppRun <<'EOF'
+          #!/usr/bin/env bash
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec "$HERE/usr/bin/tidaluna-installer" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
+          cat > AppDir/tidaluna-installer.desktop <<'EOF'
+          [Desktop Entry]
+          Name=TidaLuna Installer
+          Comment=Install or remove TidaLuna from TIDAL
+          Exec=tidaluna-installer
+          Icon=tidaluna-installer
+          Terminal=false
+          Type=Application
+          Categories=Utility;
+          StartupNotify=true
+          EOF
+
+          cp AppDir/tidaluna-installer.desktop AppDir/usr/share/applications/tidaluna-installer.desktop
+
+          python3 - <<'PY'
+          import struct, zlib
+          width = height = 1
+          bit_depth = 8
+          color_type = 6
+          ihdr = struct.pack(">IIBBBBB", width, height, bit_depth, color_type, 0, 0, 0)
+
+          def chunk(kind, data):
+              return (
+                  struct.pack(">I", len(data))
+                  + kind
+                  + data
+                  + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+              )
+
+          raw = b"\x00\x40\x7A\xF6\xFF"
+          png = (
+              b"\x89PNG\r\n\x1a\n"
+              + chunk(b"IHDR", ihdr)
+              + chunk(b"IDAT", zlib.compress(raw, 9))
+              + chunk(b"IEND", b"")
+          )
+          with open("AppDir/tidaluna-installer.png", "wb") as file:
+              file.write(png)
+          PY
+
+          cp AppDir/tidaluna-installer.png AppDir/usr/share/icons/hicolor/256x256/apps/tidaluna-installer.png
+
+          curl -L -o appimagetool.AppImage \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool.AppImage
+          ARCH=x86_64 ./appimagetool.AppImage --appimage-extract-and-run AppDir ./installer-linux-x86_64-${TAG}.AppImage
+          chmod +x ./installer-linux-x86_64-${TAG}.AppImage
 
       - name: Build for Windows
         if: matrix.platform.os-name == 'windows-x86_64'
@@ -122,16 +225,90 @@ jobs:
       - name: Build for macOS (Intel)
         if: matrix.platform.os-name == 'macOS-x86_64'
         run: |
+          set -euo pipefail
           cargo build --release --target ${{ matrix.platform.rust-target }}
-          mv target/${{ matrix.platform.rust-target }}/release/tidaluna-installer ./installer-macOS-x86_64-${{ steps.get_version.outputs.new_tag }}
-          chmod +x ./installer-macOS-x86_64-${{ steps.get_version.outputs.new_tag }}
+          TAG="${{ steps.get_version.outputs.new_tag }}"
+
+          mv target/${{ matrix.platform.rust-target }}/release/tidaluna-installer ./installer-macOS-x86_64-${TAG}
+          chmod +x ./installer-macOS-x86_64-${TAG}
+
+          APP_DIR="TidaLuna-Installer-x86_64.app"
+          mkdir -p "${APP_DIR}/Contents/MacOS"
+          mkdir -p "${APP_DIR}/Contents/Resources"
+
+          cp ./installer-macOS-x86_64-${TAG} "${APP_DIR}/Contents/MacOS/tidaluna-installer"
+          chmod +x "${APP_DIR}/Contents/MacOS/tidaluna-installer"
+
+          cat > "${APP_DIR}/Contents/Info.plist" <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleDisplayName</key>
+            <string>TidaLuna Installer</string>
+            <key>CFBundleExecutable</key>
+            <string>tidaluna-installer</string>
+            <key>CFBundleIdentifier</key>
+            <string>dev.jxnxs.tidaluna-installer</string>
+            <key>CFBundleName</key>
+            <string>TidaLuna Installer</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>0.1.0</string>
+            <key>CFBundleVersion</key>
+            <string>1</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>11.0</string>
+          </dict>
+          </plist>
+          EOF
+
+          /usr/bin/zip -r ./installer-macOS-x86_64-${TAG}.app.zip "${APP_DIR}"
 
       - name: Build for macOS (Apple Silicon)
         if: matrix.platform.os-name == 'macOS-aarch64'
         run: |
+          set -euo pipefail
           cargo build --release --target ${{ matrix.platform.rust-target }}
-          mv target/${{ matrix.platform.rust-target }}/release/tidaluna-installer ./installer-macOS-aarch64-${{ steps.get_version.outputs.new_tag }}
-          chmod +x ./installer-macOS-aarch64-${{ steps.get_version.outputs.new_tag }}
+          TAG="${{ steps.get_version.outputs.new_tag }}"
+
+          mv target/${{ matrix.platform.rust-target }}/release/tidaluna-installer ./installer-macOS-aarch64-${TAG}
+          chmod +x ./installer-macOS-aarch64-${TAG}
+
+          APP_DIR="TidaLuna-Installer-aarch64.app"
+          mkdir -p "${APP_DIR}/Contents/MacOS"
+          mkdir -p "${APP_DIR}/Contents/Resources"
+
+          cp ./installer-macOS-aarch64-${TAG} "${APP_DIR}/Contents/MacOS/tidaluna-installer"
+          chmod +x "${APP_DIR}/Contents/MacOS/tidaluna-installer"
+
+          cat > "${APP_DIR}/Contents/Info.plist" <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleDisplayName</key>
+            <string>TidaLuna Installer</string>
+            <key>CFBundleExecutable</key>
+            <string>tidaluna-installer</string>
+            <key>CFBundleIdentifier</key>
+            <string>dev.jxnxs.tidaluna-installer</string>
+            <key>CFBundleName</key>
+            <string>TidaLuna Installer</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>0.1.0</string>
+            <key>CFBundleVersion</key>
+            <string>1</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>11.0</string>
+          </dict>
+          </plist>
+          EOF
+
+          /usr/bin/zip -r ./installer-macOS-aarch64-${TAG}.app.zip "${APP_DIR}"
 
       - name: Create artifacts directory
         run: |
