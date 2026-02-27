@@ -3,11 +3,14 @@ use iced::{
     Settings, Shadow, Size, Subscription, Theme, Vector,
 };
 use iced::widget::{
-    button, checkbox, combo_box, horizontal_space, progress_bar, scrollable, text, text_input,
+    button, checkbox, combo_box, horizontal_space, image, progress_bar, scrollable, text,
+    text_input, tooltip,
     Column, Container, Row, Scrollable,
 };
+use iced::widget::tooltip::Position;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::sync::Semaphore;
 use tokio::runtime::Runtime;
 
 use crate::installer::{
@@ -45,6 +48,7 @@ pub struct AppVersionInfo {
 pub enum Message {
     LoadReleases,
     ReleasesLoaded(Result<Vec<AppRelease>, String>),
+    StargazersLoaded(Result<Vec<Stargazer>, String>),
     ReleaseChannelSelected(String),
     VersionSelected(String),
     InstallPathChanged(String),
@@ -70,6 +74,13 @@ pub struct InstallExecutionResult {
     success: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct Stargazer {
+    login: String,
+    tooltip_text: String,
+    avatar: image::Handle,
+}
+
 
 #[derive(Debug, Clone)]
 pub struct MyApp {
@@ -83,11 +94,14 @@ pub struct MyApp {
     is_uninstalling: bool,
     is_advanced_open: bool,
     is_luna_installed: bool,
+    is_loading_stargazers: bool,
 
     channel_pick_list: combo_box::State<String>,
     version_pick_list: combo_box::State<String>,
     install_path_pick_list: combo_box::State<String>,
     install_path_options: Vec<String>,
+    stargazers: Vec<Stargazer>,
+    stargazers_error: Option<String>,
 
     log_entries: Vec<LogEntry>,
     
@@ -127,10 +141,13 @@ impl Default for MyApp {
             is_uninstalling: false,
             is_advanced_open: false,
             is_luna_installed: false,
+            is_loading_stargazers: true,
             channel_pick_list,
             version_pick_list,
             install_path_pick_list,
             install_path_options: Vec::new(),
+            stargazers: Vec::new(),
+            stargazers_error: None,
             log_entries: Vec::new(),
             runtime: Arc::new(
                 Runtime::new().unwrap_or_else(|e| {
@@ -156,12 +173,14 @@ impl Application for MyApp {
             Message::InstallationStatus(is_installed)
         });
         let detect_paths = Command::perform(detect_tidal_paths_async(app.runtime.clone()), Message::TidalPathsDetected);
+        let load_stargazers = Command::perform(load_stargazers_async(app.runtime.clone()), Message::StargazersLoaded);
 
         let cmd = Command::batch(vec![
             Command::perform(async {}, |_| Message::LoadReleases),
             load_releases,
             check_installation,
             detect_paths,
+            load_stargazers,
         ]);
 
         (app, cmd)
@@ -212,6 +231,24 @@ impl Application for MyApp {
                         );
                     }
                 }
+                Command::none()
+            }
+
+            Message::StargazersLoaded(result) => {
+                self.is_loading_stargazers = false;
+
+                match result {
+                    Ok(stargazers) => {
+                        self.stargazers = stargazers;
+                        self.stargazers_error = None;
+                    }
+                    Err(err) => {
+                        self.stargazers.clear();
+                        self.stargazers_error = Some(err.clone());
+                        self.add_log(&format!("Failed to load stargazers: {}", err), LogLevel::Info);
+                    }
+                }
+
                 Command::none()
             }
 
@@ -808,7 +845,8 @@ impl Application for MyApp {
             .width(Length::Fill)
             .push(header_box)
             .push(legal_warning)
-            .push(main_box);
+            .push(main_box)
+            .push(self.view_stargazers());
 
         Container::new(
             Scrollable::new(Container::new(content).width(Length::Fill).center_x()),
@@ -852,6 +890,130 @@ impl MyApp {
         self.log_entries.clear();
         self.add_log("Log cleared", LogLevel::Info);
     }
+
+    fn view_stargazers(&self) -> Element<'_, Message> {
+        let card_style = |_: &Theme| iced::widget::container::Appearance {
+            text_color: None,
+            background: Some(Background::Color(Color::from_rgba(0.11, 0.12, 0.16, 0.94))),
+            border: Border {
+                radius: 8.0.into(),
+                width: 1.0,
+                color: Color::from_rgba(0.45, 0.55, 0.9, 0.18),
+            },
+            shadow: Shadow {
+                color: Color::from_rgba(0.0, 0.0, 0.0, 0.45),
+                offset: Vector::new(0.0, 8.0),
+                blur_radius: 18.0,
+            },
+        };
+
+        let title = text("Stargazers <3")
+            .size(16)
+            .style(iced::theme::Text::Color(Color::from_rgb(0.80, 0.83, 0.90)));
+
+        let subtitle = text("Thanks to everyone who starred this project.")
+            .size(12)
+            .style(iced::theme::Text::Color(Color::from_rgb(0.65, 0.68, 0.75)));
+
+        let section_body: Element<'_, Message> = if self.is_loading_stargazers {
+            text("Loading stargazers...")
+                .size(13)
+                .style(iced::theme::Text::Color(Color::from_rgb(0.72, 0.74, 0.8)))
+                .into()
+        } else if let Some(err) = &self.stargazers_error {
+            text(format!("Could not load stargazers: {}", err))
+                .size(13)
+                .style(iced::theme::Text::Color(Color::from_rgb(0.78, 0.44, 0.44)))
+                .into()
+        } else if self.stargazers.is_empty() {
+            text("No stargazers found yet.")
+                .size(13)
+                .style(iced::theme::Text::Color(Color::from_rgb(0.72, 0.74, 0.8)))
+                .into()
+        } else {
+            let per_row = 14;
+            let mut grid = Column::new().spacing(8);
+
+            for chunk in self.stargazers.chunks(per_row) {
+                let row = chunk.iter().fold(Row::new().spacing(8), |row, stargazer| {
+                    let avatar = Container::new(
+                        image(stargazer.avatar.clone())
+                            .width(Length::Fixed(36.0))
+                            .height(Length::Fixed(36.0)),
+                    )
+                    .width(Length::Fixed(38.0))
+                    .height(Length::Fixed(38.0));
+
+                    row.push(
+                        tooltip(
+                            avatar,
+                            text(stargazer.tooltip_text.clone()).size(12),
+                            Position::Top,
+                        )
+                        .padding(8),
+                    )
+                });
+
+                grid = grid.push(row);
+            }
+
+            scrollable(Container::new(grid).width(Length::Fill))
+                .height(Length::Fixed(220.0))
+                .into()
+        };
+
+        Container::new(
+            Column::new()
+                .spacing(8)
+                .push(title)
+                .push(subtitle)
+                .push(section_body),
+        )
+        .padding(14)
+        .width(Length::Fill)
+        .style(card_style)
+        .into()
+    }
+}
+
+
+#[derive(Debug, Deserialize)]
+struct GitHubStargazer {
+    login: String,
+    html_url: String,
+    avatar_url: String,
+}
+
+fn sanitize_login(login: &str) -> Option<String> {
+    let value = login.trim();
+
+    if value.is_empty() || value.len() > 39 {
+        return None;
+    }
+
+    if value
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || character == '-')
+    {
+        Some(value.to_string())
+    } else {
+        None
+    }
+}
+
+fn sanitize_profile_url(url: &str, fallback_login: &str) -> String {
+    let fallback = format!("https://github.com/{}", fallback_login);
+    let value = url.trim();
+
+    if !value.starts_with("https://github.com/") {
+        return fallback;
+    }
+
+    if value.chars().any(|character| character.is_control()) {
+        return fallback;
+    }
+
+    value.to_string()
 }
 
 
@@ -886,6 +1048,123 @@ async fn load_releases_async(runtime: Arc<Runtime>) -> Result<Vec<AppRelease>, S
     match result {
         Ok(inner_result) => inner_result,
         Err(_) => Err("Failed to load releases: task cancelled".to_string()),
+    }
+}
+
+async fn load_stargazers_async(runtime: Arc<Runtime>) -> Result<Vec<Stargazer>, String> {
+    let result = runtime
+        .spawn(async move {
+            let client = reqwest::Client::builder()
+                .user_agent("tidaluna-installer")
+                .timeout(std::time::Duration::from_secs(15))
+                .build()
+                .map_err(|error| format!("failed to create stargazer http client: {}", error))?;
+
+            let mut page = 1;
+            let mut users = Vec::<GitHubStargazer>::new();
+
+            loop {
+                let response = client
+                    .get("https://api.github.com/repos/jxnxsdev/TidaLuna-Installer/stargazers")
+                    .query(&[("per_page", "100"), ("page", &page.to_string())])
+                    .send()
+                    .await
+                    .map_err(|error| format!("stargazers request failed: {}", error))?;
+
+                if !response.status().is_success() {
+                    return Err(format!("stargazers request returned {}", response.status()));
+                }
+
+                let batch: Vec<GitHubStargazer> = response
+                    .json()
+                    .await
+                    .map_err(|error| format!("failed to parse stargazers response: {}", error))?;
+
+                if batch.is_empty() {
+                    break;
+                }
+
+                let count = batch.len();
+                users.extend(batch);
+
+                if count < 100 {
+                    break;
+                }
+
+                page += 1;
+                if page > 20 {
+                    break;
+                }
+            }
+
+            let mut candidates = Vec::<(String, String, String)>::new();
+
+            for user in users {
+                let Some(login) = sanitize_login(&user.login) else {
+                    continue;
+                };
+
+                let profile_url = sanitize_profile_url(&user.html_url, &login);
+                let avatar_url = user.avatar_url.trim();
+
+                if !avatar_url.starts_with("https://") || avatar_url.chars().any(|character| character.is_control()) {
+                    continue;
+                }
+
+                candidates.push((login, profile_url, avatar_url.to_string()));
+            }
+
+            let semaphore = Arc::new(Semaphore::new(12));
+            let mut join_set = tokio::task::JoinSet::new();
+
+            for (login, profile_url, avatar_url) in candidates {
+                let client = client.clone();
+                let semaphore = semaphore.clone();
+
+                join_set.spawn(async move {
+                    let Ok(_permit) = semaphore.acquire_owned().await else {
+                        return None;
+                    };
+
+                    let avatar_response = match client.get(&avatar_url).send().await {
+                        Ok(response) => response,
+                        Err(_) => return None,
+                    };
+
+                    if !avatar_response.status().is_success() {
+                        return None;
+                    }
+
+                    let avatar_bytes = match avatar_response.bytes().await {
+                        Ok(bytes) => bytes,
+                        Err(_) => return None,
+                    };
+
+                    Some(Stargazer {
+                        tooltip_text: format!("{}\n{}", login, profile_url),
+                        login,
+                        avatar: image::Handle::from_memory(avatar_bytes.to_vec()),
+                    })
+                });
+            }
+
+            let mut stargazers = Vec::new();
+
+            while let Some(joined) = join_set.join_next().await {
+                if let Ok(Some(stargazer)) = joined {
+                    stargazers.push(stargazer);
+                }
+            }
+
+            stargazers.sort_by(|a, b| a.login.to_lowercase().cmp(&b.login.to_lowercase()));
+
+            Ok(stargazers)
+        })
+        .await;
+
+    match result {
+        Ok(inner_result) => inner_result,
+        Err(_) => Err("Failed to load stargazers: task cancelled".to_string()),
     }
 }
 
