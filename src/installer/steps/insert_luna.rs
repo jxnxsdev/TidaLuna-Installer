@@ -111,7 +111,9 @@ pub async fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) -> std::io::Result
             let src_path = entry.path();
             let dst_path = current_dst.join(entry.file_name());
 
-            if file_type.is_dir() {
+            if file_type.is_symlink() {
+                continue;
+            } else if file_type.is_dir() {
                 queue.push_back((src_path, dst_path));
             } else {
                 fs::copy(&src_path, &dst_path).await?;

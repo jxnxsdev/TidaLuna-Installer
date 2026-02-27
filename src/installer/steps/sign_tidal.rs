@@ -1,4 +1,5 @@
 use crate::installer::step::{InstallStep, StepResult, SubLog};
+use crate::utils::fs_helpers::get_tidal_directory;
 use async_trait::async_trait;
 use std::process::Command;
 
@@ -38,13 +39,26 @@ impl InstallStep for SignTidalStep {
                     message: "Signing TIDAL on macOS...".into(),
                 });
 
+                let sign_target = match get_tidal_directory().await {
+                    Ok(resources_path) => resources_path
+                        .parent()
+                        .and_then(|contents| contents.parent())
+                        .map(|app_bundle| app_bundle.to_path_buf())
+                        .unwrap_or_else(|| std::path::PathBuf::from("/Applications/TIDAL.app")),
+                    Err(_) => std::path::PathBuf::from("/Applications/TIDAL.app"),
+                };
+
+                sublog_callback(SubLog {
+                    message: format!("Using codesign target: {:?}", sign_target),
+                });
+
                 let output = Command::new("codesign")
                     .args([
                         "--force",
                         "--deep",
                         "--sign",
                         "-",
-                        "/Applications/TIDAL.app",
+                        sign_target.to_string_lossy().as_ref(),
                     ])
                     .output();
 

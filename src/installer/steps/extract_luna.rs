@@ -2,7 +2,25 @@ use crate::installer::step::{InstallStep, StepResult, SubLog};
 use async_trait::async_trait;
 use std::fs;
 use std::fs::File;
+use std::path::{Component, Path};
 use zip::ZipArchive;
+
+const MAX_ZIP_ENTRY_SIZE: u64 = 100 * 1024 * 1024;
+
+fn safe_zip_join(base: &Path, zip_entry_name: &str) -> Option<std::path::PathBuf> {
+    let entry_path = Path::new(zip_entry_name);
+
+    let mut safe_relative = std::path::PathBuf::new();
+    for component in entry_path.components() {
+        match component {
+            Component::Normal(segment) => safe_relative.push(segment),
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return None,
+        }
+    }
+
+    Some(base.join(safe_relative))
+}
 
 pub struct ExtractLunaStep;
 
@@ -47,7 +65,27 @@ impl InstallStep for ExtractLunaStep {
                 Ok(f) => f,
                 Err(e) => return StepResult { success: false, message: format!("Failed to access zip entry: {}", e) },
             };
-            let out_path = extract_path.join(file_in_zip.name());
+
+            if file_in_zip.size() > MAX_ZIP_ENTRY_SIZE {
+                return StepResult {
+                    success: false,
+                    message: format!(
+                        "Zip entry is too large (>{} bytes): {}",
+                        MAX_ZIP_ENTRY_SIZE,
+                        file_in_zip.name()
+                    ),
+                };
+            }
+
+            let out_path = match safe_zip_join(&extract_path, file_in_zip.name()) {
+                Some(path) => path,
+                None => {
+                    return StepResult {
+                        success: false,
+                        message: format!("Unsafe zip entry path rejected: {}", file_in_zip.name()),
+                    }
+                }
+            };
 
             if file_in_zip.is_dir() {
                 if let Err(e) = fs::create_dir_all(&out_path) {

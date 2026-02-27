@@ -1,5 +1,6 @@
 use crate::installer::step::{InstallStep, StepResult, SubLog};
 use async_trait::async_trait;
+use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
@@ -41,7 +42,20 @@ impl InstallStep for DownloadLunaStep {
             message: "Downloading Luna...".into(),
         });
 
-        let response = match reqwest::get(&self.download_url).await {
+        let client = match reqwest::Client::builder()
+            .timeout(Duration::from_secs(120))
+            .build()
+        {
+            Ok(client) => client,
+            Err(err) => {
+                return StepResult {
+                    success: false,
+                    message: format!("Failed to build HTTP client: {}", err),
+                };
+            }
+        };
+
+        let response = match client.get(&self.download_url).send().await {
             Ok(resp) => resp,
             Err(err) => {
                 return StepResult {

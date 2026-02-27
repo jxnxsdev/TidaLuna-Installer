@@ -144,8 +144,15 @@ pub async fn run_cli(args: Args) {
                 let va = Version::parse(&a.version).unwrap_or_else(|_| Version::new(0, 0, 0));
                 let vb = Version::parse(&b.version).unwrap_or_else(|_| Version::new(0, 0, 0));
                 va.cmp(&vb)
-            })
-            .unwrap();
+            });
+
+        let latest_version = match latest_version {
+            Some(version) => version,
+            None => {
+                eprintln!("Selected release channel '{}' has no versions", selected_release.name);
+                return;
+            }
+        };
 
         // Determine install path
         let path: PathBuf = match resolve_cli_tidal_path(&args.path).await {
