@@ -23,6 +23,26 @@ enum LaunchCandidate {
     },
 }
 
+#[cfg(target_os = "linux")]
+fn is_running_as_root_linux() -> bool {
+    match Command::new("id").arg("-u").output() {
+        Ok(output) => {
+            if !output.status.success() {
+                return false;
+            }
+
+            let uid = String::from_utf8_lossy(&output.stdout);
+            uid.trim() == "0"
+        }
+        Err(_) => false,
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn is_running_as_root_linux() -> bool {
+    false
+}
+
 fn build_launch_candidates(resources_path: &Path) -> Vec<LaunchCandidate> {
     match std::env::consts::OS {
         "windows" => {
@@ -159,6 +179,17 @@ impl InstallStep for LaunchTidalStep {
     }
 
     async fn run(&self, sublog_callback: &(dyn Fn(SubLog) + Send + Sync)) -> StepResult {
+        if is_running_as_root_linux() {
+            sublog_callback(SubLog {
+                message: "Skipping auto-launch: running as root on Linux is not supported by Electron (sandbox restriction). Launch TIDAL manually as your normal user.".into(),
+            });
+
+            return StepResult {
+                success: true,
+                message: "Installation finished; TIDAL auto-launch skipped for root Linux session".into(),
+            };
+        }
+
         let resources_path = if let Some(path) = &self.overwrite_path {
             path.clone()
         } else {

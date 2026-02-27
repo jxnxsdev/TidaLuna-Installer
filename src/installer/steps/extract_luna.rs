@@ -2,6 +2,7 @@ use crate::installer::step::{InstallStep, StepResult, SubLog};
 use async_trait::async_trait;
 use std::fs;
 use std::fs::File;
+use std::io::Read;
 use std::path::{Component, Path};
 use zip::ZipArchive;
 
@@ -49,6 +50,42 @@ impl InstallStep for ExtractLunaStep {
         }
 
         sublog_callback(SubLog { message: "Extracting Luna...".into() });
+
+        let mut raw_bytes = Vec::new();
+        match File::open(&zip_path) {
+            Ok(mut zip_file) => {
+                if let Err(e) = zip_file.read_to_end(&mut raw_bytes) {
+                    return StepResult {
+                        success: false,
+                        message: format!("Failed to read zip bytes before extraction: {}", e),
+                    };
+                }
+            }
+            Err(e) => {
+                return StepResult {
+                    success: false,
+                    message: format!("Failed to open zip for validation: {}", e),
+                };
+            }
+        }
+
+        if raw_bytes.len() < 22 {
+            return StepResult {
+                success: false,
+                message: format!("Zip file is unexpectedly small: {} bytes", raw_bytes.len()),
+            };
+        }
+
+        if let Err(e) = ZipArchive::new(std::io::Cursor::new(&raw_bytes)) {
+            return StepResult {
+                success: false,
+                message: format!(
+                    "Failed ZIP validation before extraction: {} (size: {} bytes)",
+                    e,
+                    raw_bytes.len()
+                ),
+            };
+        }
         
         let file = match File::open(&zip_path) {
             Ok(f) => f,
