@@ -18,8 +18,9 @@ mod tasks;
 
 use models::{LogEntry, LogLevel, Message, MyApp};
 use tasks::{
-    check_installation_async, detect_tidal_paths_async, install_async, load_releases_async,
-    load_stargazers_async, uninstall_async,
+    apply_installer_update_async, check_installation_async, check_installer_update_async,
+    detect_tidal_paths_async, install_async, load_releases_async, load_stargazers_async,
+    uninstall_async,
 };
 
 impl Default for MyApp {
@@ -47,6 +48,10 @@ impl Default for MyApp {
             stargazers: Vec::new(),
             stargazers_error: None,
             stargazers_page: 0,
+            current_installer_version: env!("CARGO_PKG_VERSION").to_string(),
+            available_installer_update: None,
+            show_installer_update_prompt: false,
+            is_applying_installer_update: false,
             log_entries: Vec::new(),
             runtime: Arc::new(
                 Runtime::new().unwrap_or_else(|e| {
@@ -71,6 +76,10 @@ impl Application for MyApp {
         let check_installation = Command::perform(check_installation_async(app.runtime.clone()), |is_installed| {
             Message::InstallationStatus(is_installed)
         });
+        let check_update = Command::perform(
+            check_installer_update_async(app.runtime.clone(), app.current_installer_version.clone()),
+            Message::InstallerUpdateChecked,
+        );
         let detect_paths = Command::perform(detect_tidal_paths_async(app.runtime.clone()), Message::TidalPathsDetected);
         let load_stargazers = Command::perform(load_stargazers_async(app.runtime.clone()), Message::StargazersLoaded);
 
@@ -78,6 +87,7 @@ impl Application for MyApp {
             Command::perform(async {}, |_| Message::LoadReleases),
             load_releases,
             check_installation,
+            check_update,
             detect_paths,
             load_stargazers,
         ]);
@@ -86,7 +96,7 @@ impl Application for MyApp {
     }
     
     fn title(&self) -> String {
-        "TidaLuna Installer".to_string()
+        format!("TidaLuna Installer v{}", self.current_installer_version)
     }
 
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
@@ -130,6 +140,73 @@ impl Application for MyApp {
                         );
                     }
                 }
+                Command::none()
+            }
+
+            Message::InstallerUpdateChecked(result) => {
+                match result {
+                    Ok(Some(update)) => {
+                        self.available_installer_update = Some(update);
+                        self.show_installer_update_prompt = true;
+                    }
+                    Ok(None) => {
+                        self.available_installer_update = None;
+                        self.show_installer_update_prompt = false;
+                    }
+                    Err(err) => {
+                        self.add_log(&format!("Installer update check failed: {}", err), LogLevel::Info);
+                    }
+                }
+                Command::none()
+            }
+
+            Message::AcceptInstallerUpdate => {
+                let Some(update) = self.available_installer_update.clone() else {
+                    return Command::none();
+                };
+
+                if self.is_applying_installer_update {
+                    return Command::none();
+                }
+
+                self.is_applying_installer_update = true;
+                self.add_log(
+                    &format!("Downloading installer update v{}...", update.version),
+                    LogLevel::Info,
+                );
+
+                let runtime = self.runtime.clone();
+                let url = update.download_url;
+                Command::perform(
+                    apply_installer_update_async(runtime, url),
+                    Message::InstallerUpdateApplied,
+                )
+            }
+
+            Message::DeclineInstallerUpdate => {
+                self.show_installer_update_prompt = false;
+                self.available_installer_update = None;
+                Command::none()
+            }
+
+            Message::InstallerUpdateApplied(result) => {
+                self.is_applying_installer_update = false;
+
+                match result {
+                    Ok(outcome) => {
+                        self.add_log(&outcome.message, LogLevel::Success);
+                        self.show_installer_update_prompt = false;
+                        self.available_installer_update = None;
+
+                        if outcome.should_exit {
+                            std::process::exit(0);
+                        }
+                    }
+                    Err(err) => {
+                        self.add_log(&format!("Installer update failed: {}", err), LogLevel::Error);
+                    }
+                }
+
                 Command::none()
             }
 
@@ -222,6 +299,11 @@ impl Application for MyApp {
             }
 
             Message::Install => {
+                if self.show_installer_update_prompt || self.is_applying_installer_update {
+                    self.add_log("Update prompt is active. Complete or skip the installer update first.", LogLevel::Info);
+                    return Command::none();
+                }
+
                 if self.custom_install_path.trim().is_empty() && self.selected_install_path.trim().is_empty() {
                     self.add_log("No TIDAL path selected. Choose one from the dropdown or enter a custom path in Advanced Options.", LogLevel::Error);
                     return Command::none();
@@ -246,6 +328,11 @@ impl Application for MyApp {
             }
 
             Message::Uninstall => {
+                if self.show_installer_update_prompt || self.is_applying_installer_update {
+                    self.add_log("Update prompt is active. Complete or skip the installer update first.", LogLevel::Info);
+                    return Command::none();
+                }
+
                 if self.custom_install_path.trim().is_empty() && self.selected_install_path.trim().is_empty() {
                     self.add_log("No TIDAL path selected. Choose one from the dropdown or enter a custom path in Advanced Options.", LogLevel::Error);
                     return Command::none();
@@ -380,6 +467,10 @@ impl Application for MyApp {
         let subsubtitle = text("Works for the official TIDAL app and tidal-hifi. Note: If you are using the windows store version of TIDAL, please uninstall it and install the version from the official website.")
             .size(12)
             .style(iced::theme::Text::Color(Color::from_rgb(0.74, 0.76, 0.84)));
+
+        let version_text = text(format!("Installer version: v{}", self.current_installer_version))
+            .size(12)
+            .style(iced::theme::Text::Color(Color::from_rgb(0.62, 0.67, 0.76)));
 
         let status_text_label = if self.is_luna_installed {
             let installed_label = if cfg!(target_os = "windows") {
@@ -682,7 +773,8 @@ impl Application for MyApp {
                         .push(status_text),
                 )
                 .push(subtitle)
-                .push(subsubtitle),
+                .push(subsubtitle)
+                .push(version_text),
         )
         .padding(18)
         .width(Length::Fill)
@@ -760,6 +852,7 @@ impl Application for MyApp {
             .padding(24)
             .width(Length::Fill)
             .push(header_box)
+            .push(self.view_update_prompt())
             .push(legal_warning)
             .push(main_box)
             .push(self.view_stargazers());
@@ -815,6 +908,86 @@ impl MyApp {
         } else {
             self.stargazers.len().div_ceil(Self::STARGAZERS_PER_PAGE)
         }
+    }
+
+    fn view_update_prompt(&self) -> Element<'_, Message> {
+        if !self.show_installer_update_prompt {
+            return Container::new(Row::new()).into();
+        }
+
+        let Some(update) = &self.available_installer_update else {
+            return Container::new(Row::new()).into();
+        };
+
+        let update_now_button = if self.is_applying_installer_update {
+            button(
+                text("Updating...")
+                    .style(iced::theme::Text::Color(Color::from_rgb(0.5, 0.5, 0.5))),
+            )
+            .padding([10, 14])
+        } else {
+            button(text("Update now"))
+                .on_press(Message::AcceptInstallerUpdate)
+                .padding([10, 14])
+                .style(iced::theme::Button::Primary)
+        };
+
+        let skip_button = if self.is_applying_installer_update {
+            button(
+                text("Skip")
+                    .style(iced::theme::Text::Color(Color::from_rgb(0.5, 0.5, 0.5))),
+            )
+            .padding([10, 14])
+        } else {
+            button(text("Skip this version"))
+                .on_press(Message::DeclineInstallerUpdate)
+                .padding([10, 14])
+                .style(iced::theme::Button::Secondary)
+        };
+
+        let warning_style = |_: &Theme| iced::widget::container::Appearance {
+            text_color: None,
+            background: Some(Background::Color(Color::from_rgba(0.26, 0.19, 0.08, 0.95))),
+            border: Border {
+                radius: 8.0.into(),
+                width: 1.0,
+                color: Color::from_rgba(0.95, 0.75, 0.25, 0.28),
+            },
+            shadow: Shadow {
+                color: Color::from_rgba(0.0, 0.0, 0.0, 0.38),
+                offset: Vector::new(0.0, 8.0),
+                blur_radius: 16.0,
+            },
+        };
+
+        Container::new(
+            Column::new()
+                .spacing(8)
+                .push(
+                    text("Installer Update Available")
+                        .size(16)
+                        .style(iced::theme::Text::Color(Color::from_rgb(0.98, 0.80, 0.35))),
+                )
+                .push(
+                    text(format!(
+                        "A newer installer version (v{}) is available. Update before continuing?",
+                        update.version
+                    ))
+                    .size(14)
+                    .style(iced::theme::Text::Color(Color::from_rgb(0.9, 0.9, 0.9))),
+                )
+                .push(
+                    Row::new()
+                        .spacing(10)
+                        .align_items(Alignment::Center)
+                        .push(update_now_button)
+                        .push(skip_button),
+                ),
+        )
+        .padding(12)
+        .width(Length::Fill)
+        .style(warning_style)
+        .into()
     }
 
     fn view_stargazers(&self) -> Element<'_, Message> {

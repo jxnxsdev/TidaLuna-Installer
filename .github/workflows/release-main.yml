@@ -110,9 +110,11 @@ jobs:
         if: matrix.platform.os-name == 'linux-x86_64'
         run: |
           set -euo pipefail
-          cargo build --release --target ${{ matrix.platform.rust-target }}
           TAG="${{ steps.get_version.outputs.new_tag }}"
           VERSION="${TAG#v}"
+
+          sed -i -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"${VERSION}\"/" Cargo.toml
+          cargo build --release --target ${{ matrix.platform.rust-target }}
 
           mv target/${{ matrix.platform.rust-target }}/release/tidaluna-installer ./installer-linux-x86_64-${TAG}
           chmod +x ./installer-linux-x86_64-${TAG}
@@ -219,6 +221,12 @@ jobs:
       - name: Build for Windows
         if: matrix.platform.os-name == 'windows-x86_64'
         run: |
+          $tag = "${{ steps.get_version_win.outputs.new_tag }}"
+          $version = $tag -replace '^v', ''
+          $cargoToml = Get-Content Cargo.toml -Raw
+          $cargoToml = $cargoToml -replace '(?m)^version = "[0-9]+\.[0-9]+\.[0-9]+"', "version = `"$version`""
+          Set-Content Cargo.toml $cargoToml
+
           cargo build --release --target ${{ matrix.platform.rust-target }}
           move target\${{ matrix.platform.rust-target }}\release\tidaluna-installer.exe installer-windows-x86_64-${{ steps.get_version_win.outputs.new_tag }}.exe
 
@@ -226,8 +234,11 @@ jobs:
         if: matrix.platform.os-name == 'macOS-x86_64'
         run: |
           set -euo pipefail
-          cargo build --release --target ${{ matrix.platform.rust-target }}
           TAG="${{ steps.get_version.outputs.new_tag }}"
+          VERSION="${TAG#v}"
+
+          sed -i '' -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"${VERSION}\"/" Cargo.toml
+          cargo build --release --target ${{ matrix.platform.rust-target }}
 
           mv target/${{ matrix.platform.rust-target }}/release/tidaluna-installer ./installer-macOS-x86_64-${TAG}
           chmod +x ./installer-macOS-x86_64-${TAG}
@@ -270,8 +281,11 @@ jobs:
         if: matrix.platform.os-name == 'macOS-aarch64'
         run: |
           set -euo pipefail
-          cargo build --release --target ${{ matrix.platform.rust-target }}
           TAG="${{ steps.get_version.outputs.new_tag }}"
+          VERSION="${TAG#v}"
+
+          sed -i '' -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"${VERSION}\"/" Cargo.toml
+          cargo build --release --target ${{ matrix.platform.rust-target }}
 
           mv target/${{ matrix.platform.rust-target }}/release/tidaluna-installer ./installer-macOS-aarch64-${TAG}
           chmod +x ./installer-macOS-aarch64-${TAG}

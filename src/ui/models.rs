@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
+pub type InstallerUpdateInfo = crate::utils::updater::UpdateInfo;
+pub type InstallerUpdateApplyResult = crate::utils::updater::UpdateApplyResult;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppRelease {
     pub name: String,
@@ -19,6 +22,10 @@ pub struct AppVersionInfo {
 pub enum Message {
     LoadReleases,
     ReleasesLoaded(Result<Vec<AppRelease>, String>),
+    InstallerUpdateChecked(Result<Option<InstallerUpdateInfo>, String>),
+    AcceptInstallerUpdate,
+    DeclineInstallerUpdate,
+    InstallerUpdateApplied(Result<InstallerUpdateApplyResult, String>),
     StargazersLoaded(Result<Vec<Stargazer>, String>),
     ReleaseChannelSelected(String),
     VersionSelected(String),
@@ -75,6 +82,10 @@ pub struct MyApp {
     pub stargazers: Vec<Stargazer>,
     pub stargazers_error: Option<String>,
     pub stargazers_page: usize,
+    pub current_installer_version: String,
+    pub available_installer_update: Option<InstallerUpdateInfo>,
+    pub show_installer_update_prompt: bool,
+    pub is_applying_installer_update: bool,
 
     pub log_entries: Vec<LogEntry>,
     pub runtime: Arc<Runtime>,
