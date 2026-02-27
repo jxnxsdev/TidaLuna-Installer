@@ -1,8 +1,9 @@
 use crate::args::Args;
 use crate::utils::{
     release_loader::ReleaseLoader,
-    fs_helpers::{get_tidal_directory, is_luna_installed, normalize_tidal_resources_path},
+    fs_helpers::{find_tidal_directories, is_luna_installed, normalize_tidal_resources_path},
 };
+use std::io::{self, Write};
 use std::path::PathBuf;
 use semver::Version;
 
@@ -15,6 +16,7 @@ use crate::installer::{
     steps::kill_tidal::KillTidalStep,
     steps::sign_tidal::SignTidalStep,
     steps::launch_tidal::LaunchTidalStep,
+    steps::reinstall_cleanup::ReinstallCleanupStep,
     steps::uninstall::UninstallStep,
     steps::copy_asar_uninstall::CopyAsarUninstallStep,
     manager::InstallManager,
@@ -31,6 +33,50 @@ fn print_failure_banner(step_name: &str, message: &str) {
     println!("!! STEP FAILED: {} !!", step_name);
     println!("!! {} !!", message);
     println!("{}", "!".repeat(60));
+}
+
+fn prompt_user_for_tidal_path(paths: &[PathBuf]) -> io::Result<PathBuf> {
+    println!("Multiple TIDAL installations were found. Please choose one path:\n");
+    for (index, path) in paths.iter().enumerate() {
+        println!("  [{}] {}", index + 1, path.to_string_lossy());
+    }
+
+    loop {
+        print!("\nEnter selection (1-{}): ", paths.len());
+        io::stdout().flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+
+        let trimmed = input.trim();
+        if let Ok(choice) = trimmed.parse::<usize>() {
+            if (1..=paths.len()).contains(&choice) {
+                return Ok(paths[choice - 1].clone());
+            }
+        }
+
+        println!("Invalid selection. Please enter a number between 1 and {}.", paths.len());
+    }
+}
+
+async fn resolve_cli_tidal_path(user_path: &Option<String>) -> io::Result<PathBuf> {
+    if let Some(path) = user_path {
+        return Ok(normalize_tidal_resources_path(PathBuf::from(path)));
+    }
+
+    let found_paths = find_tidal_directories().await?;
+    if found_paths.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "Failed to find TIDAL resources directory",
+        ));
+    }
+
+    if found_paths.len() == 1 {
+        return Ok(found_paths[0].clone());
+    }
+
+    prompt_user_for_tidal_path(&found_paths)
 }
 
 pub async fn run_cli(args: Args) {
@@ -63,9 +109,12 @@ pub async fn run_cli(args: Args) {
     }
 
     // INSTALL
-    if args.install {
+    if args.install || args.reinstall {
+        let mut reinstall_mode = args.reinstall;
+
         if is_luna_installed().await.unwrap_or(false) {
             println!("TidaLuna / Neptune is already installed. Continuing with reinstall.");
+            reinstall_mode = true;
         }
 
         let version_to_install = args.version.clone();
@@ -99,15 +148,11 @@ pub async fn run_cli(args: Args) {
             .unwrap();
 
         // Determine install path
-        let path: PathBuf = if let Some(p) = &args.path {
-            normalize_tidal_resources_path(PathBuf::from(p))
-        } else {
-            match get_tidal_directory().await {
-                Ok(p) => p,
-                Err(e) => {
-                    eprintln!("Failed to find TIDAL resources directory: {}", e);
-                    return;
-                }
+        let path: PathBuf = match resolve_cli_tidal_path(&args.path).await {
+            Ok(path) => path,
+            Err(e) => {
+                eprintln!("Failed to find TIDAL resources directory: {}", e);
+                return;
             }
         };
 
@@ -117,9 +162,11 @@ pub async fn run_cli(args: Args) {
         );
 
         let mut manager = InstallManager::new();
-        manager.add_step(Box::new(SetupStep { overwrite_path: Some(path.clone()) }));
         manager.add_step(Box::new(KillTidalStep));
-        manager.add_step(Box::new(UninstallStep { overwrite_path: Some(path.clone()) }));
+        if reinstall_mode {
+            manager.add_step(Box::new(ReinstallCleanupStep { overwrite_path: Some(path.clone()) }));
+        }
+        manager.add_step(Box::new(SetupStep { overwrite_path: Some(path.clone()) }));
         manager.add_step(Box::new(DownloadLunaStep { download_url: latest_version.download.clone() }));
         manager.add_step(Box::new(ExtractLunaStep));
         manager.add_step(Box::new(CopyAsarInstallStep { overwrite_path: Some(path.clone()) }));
@@ -147,15 +194,11 @@ pub async fn run_cli(args: Args) {
 
     // UNINSTALL
     if args.uninstall {
-        let path: PathBuf = if let Some(p) = &args.path {
-            normalize_tidal_resources_path(PathBuf::from(p))
-        } else {
-            match get_tidal_directory().await {
-                Ok(p) => p,
-                Err(e) => {
-                    eprintln!("Failed to find TIDAL resources directory: {}", e);
-                    return;
-                }
+        let path: PathBuf = match resolve_cli_tidal_path(&args.path).await {
+            Ok(path) => path,
+            Err(e) => {
+                eprintln!("Failed to find TIDAL resources directory: {}", e);
+                return;
             }
         };
 

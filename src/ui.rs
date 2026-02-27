@@ -9,24 +9,23 @@ use iced::widget::{
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::runtime::Runtime;
-use tokio::sync::mpsc::{self, UnboundedSender};
 
 use crate::installer::{
     steps::{
         copy_asar_install::CopyAsarInstallStep, copy_asar_uninstall::CopyAsarUninstallStep,
         download_luna::DownloadLunaStep, extract_luna::ExtractLunaStep,
         insert_luna::InsertLunaStep, kill_tidal::KillTidalStep, setup::SetupStep,
-        sign_tidal::SignTidalStep, launch_tidal::LaunchTidalStep, uninstall::UninstallStep,
+        sign_tidal::SignTidalStep, launch_tidal::LaunchTidalStep, reinstall_cleanup::ReinstallCleanupStep, uninstall::UninstallStep,
     },
     manager::InstallManager,
 };
 use crate::utils::{
-    fs_helpers::{get_tidal_directory, is_luna_installed, normalize_tidal_resources_path},
+    fs_helpers::{find_tidal_directories, is_luna_installed, normalize_tidal_resources_path},
     release_loader::ReleaseLoader,
 };
 use semver::Version;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,14 +48,26 @@ pub enum Message {
     ReleaseChannelSelected(String),
     VersionSelected(String),
     InstallPathChanged(String),
+    InstallPathOptionSelected(String),
+    TidalPathsDetected(Result<Vec<String>, String>),
     Install,
     Uninstall,
-    InstallationStep(String),
-    InstallationSubStep(String),
-    InstallationComplete(Result<(), String>),
+    InstallationComplete(Result<InstallExecutionResult, String>),
     InstallationStatus(bool),
     ToggleAdvancedOptions(bool),
     ClearLog,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstallExecutionLog {
+    message: String,
+    is_substep: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstallExecutionResult {
+    logs: Vec<InstallExecutionLog>,
+    success: bool,
 }
 
 
@@ -65,7 +76,8 @@ pub struct MyApp {
     releases: Vec<AppRelease>,
     selected_channel: String,
     selected_version: String,
-    install_path: String,
+    selected_install_path: String,
+    custom_install_path: String,
     is_loading: bool,
     is_installing: bool,
     is_uninstalling: bool,
@@ -74,10 +86,10 @@ pub struct MyApp {
 
     channel_pick_list: combo_box::State<String>,
     version_pick_list: combo_box::State<String>,
+    install_path_pick_list: combo_box::State<String>,
+    install_path_options: Vec<String>,
 
     log_entries: Vec<LogEntry>,
-
-    sender: Option<UnboundedSender<Message>>,
     
     runtime: Arc<Runtime>,
 }
@@ -102,12 +114,14 @@ impl Default for MyApp {
     fn default() -> Self {
         let channel_pick_list = combo_box::State::new(vec![]);
         let version_pick_list = combo_box::State::new(vec![]);
+        let install_path_pick_list = combo_box::State::new(vec![]);
 
         Self {
             releases: Vec::new(),
             selected_channel: String::new(),
             selected_version: String::new(),
-            install_path: String::new(),
+            selected_install_path: String::new(),
+            custom_install_path: String::new(),
             is_loading: true,
             is_installing: false,
             is_uninstalling: false,
@@ -115,8 +129,9 @@ impl Default for MyApp {
             is_luna_installed: false,
             channel_pick_list,
             version_pick_list,
+            install_path_pick_list,
+            install_path_options: Vec::new(),
             log_entries: Vec::new(),
-            sender: None,
             runtime: Arc::new(
                 Runtime::new().unwrap_or_else(|e| {
                     panic!("Failed to create Tokio runtime: {}", e);
@@ -134,22 +149,19 @@ impl Application for MyApp {
     type Theme = Theme;
 
     fn new(_flags: ()) -> (Self, Command<Self::Message>) {
-        let (sender, _receiver) = mpsc::unbounded_channel();
-
-        let app = Self {
-            sender: Some(sender),
-            ..Self::default()
-        };
+        let app = Self::default();
 
         let load_releases = Command::perform(load_releases_async(app.runtime.clone()), Message::ReleasesLoaded);
         let check_installation = Command::perform(check_installation_async(app.runtime.clone()), |is_installed| {
             Message::InstallationStatus(is_installed)
         });
+        let detect_paths = Command::perform(detect_tidal_paths_async(app.runtime.clone()), Message::TidalPathsDetected);
 
         let cmd = Command::batch(vec![
             Command::perform(async {}, |_| Message::LoadReleases),
             load_releases,
             check_installation,
+            detect_paths,
         ]);
 
         (app, cmd)
@@ -241,11 +253,42 @@ impl Application for MyApp {
             }
 
             Message::InstallPathChanged(path) => {
-                self.install_path = path;
+                self.custom_install_path = path;
+                Command::none()
+            }
+
+            Message::InstallPathOptionSelected(path) => {
+                self.selected_install_path = path;
+                Command::none()
+            }
+
+            Message::TidalPathsDetected(result) => {
+                match result {
+                    Ok(paths) => {
+                        self.install_path_options = paths.clone();
+                        self.install_path_pick_list = combo_box::State::new(paths.clone());
+
+                        if paths.len() == 1 && self.selected_install_path.trim().is_empty() {
+                            self.selected_install_path = paths[0].clone();
+                            self.add_log("Detected one TIDAL installation path automatically", LogLevel::Info);
+                        } else if paths.len() > 1 {
+                            self.selected_install_path = paths[0].clone();
+                            self.add_log("Multiple TIDAL installations detected. Auto-selected the latest path; change it in Advanced Options if needed.", LogLevel::Info);
+                        }
+                    }
+                    Err(err) => {
+                        self.add_log(&format!("Could not auto-detect TIDAL paths: {}", err), LogLevel::Info);
+                    }
+                }
                 Command::none()
             }
 
             Message::Install => {
+                if self.custom_install_path.trim().is_empty() && self.selected_install_path.trim().is_empty() {
+                    self.add_log("No TIDAL path selected. Choose one from the dropdown or enter a custom path in Advanced Options.", LogLevel::Error);
+                    return Command::none();
+                }
+
                 self.is_installing = true;
                 self.clear_log();
                 self.add_log("Starting installation...", LogLevel::Step);
@@ -253,39 +296,35 @@ impl Application for MyApp {
                 let releases = self.releases.clone();
                 let channel = self.selected_channel.clone();
                 let version = self.selected_version.clone();
-                let path = self.install_path.clone();
-                let sender = self.sender.clone();
+                let selected_path = self.selected_install_path.clone();
+                let custom_path = self.custom_install_path.clone();
+                let reinstall_mode = self.is_luna_installed;
                 let runtime = self.runtime.clone();
 
                 Command::perform(
-                    install_async(releases, channel, version, path, sender, runtime),
+                    install_async(releases, channel, version, selected_path, custom_path, reinstall_mode, runtime),
                     Message::InstallationComplete,
                 )
             }
 
             Message::Uninstall => {
+                if self.custom_install_path.trim().is_empty() && self.selected_install_path.trim().is_empty() {
+                    self.add_log("No TIDAL path selected. Choose one from the dropdown or enter a custom path in Advanced Options.", LogLevel::Error);
+                    return Command::none();
+                }
+
                 self.is_uninstalling = true;
                 self.clear_log();
                 self.add_log("Starting uninstallation...", LogLevel::Step);
 
-                let path = self.install_path.clone();
-                let sender = self.sender.clone();
+                let selected_path = self.selected_install_path.clone();
+                let custom_path = self.custom_install_path.clone();
                 let runtime = self.runtime.clone();
 
                 Command::perform(
-                    uninstall_async(path, sender, runtime),
+                    uninstall_async(selected_path, custom_path, runtime),
                     Message::InstallationComplete,
                 )
-            }
-
-            Message::InstallationStep(step) => {
-                self.add_log(&step, LogLevel::Step);
-                Command::none()
-            }
-
-            Message::InstallationSubStep(substep) => {
-                self.add_log(&format!("  {}", substep), LogLevel::SubStep);
-                Command::none()
             }
 
             Message::InstallationComplete(result) => {
@@ -293,8 +332,20 @@ impl Application for MyApp {
                 self.is_uninstalling = false;
 
                 match result {
-                    Ok(_) => {
-                        self.add_log("Operation completed successfully!", LogLevel::Success);
+                    Ok(execution) => {
+                        for log in execution.logs {
+                            if log.is_substep {
+                                self.add_log(&format!("  {}", log.message), LogLevel::SubStep);
+                            } else {
+                                self.add_log(&log.message, LogLevel::Step);
+                            }
+                        }
+
+                        if execution.success {
+                            self.add_log("Operation completed successfully!", LogLevel::Success);
+                        } else {
+                            self.add_log("Operation failed: one or more steps failed", LogLevel::Error);
+                        }
                     }
                     Err(err) => {
                         self.add_log(&format!("Operation failed: {}", err), LogLevel::Error);
@@ -317,11 +368,6 @@ impl Application for MyApp {
 
             Message::ToggleAdvancedOptions(is_open) => {
                 self.is_advanced_open = is_open;
-                if is_open && self.install_path.trim().is_empty() {
-                    let runtime = self.runtime.clone();
-                    return Command::perform(get_default_install_path_async(runtime), Message::InstallPathChanged);
-                }
-
                 Command::none()
             }
 
@@ -383,7 +429,13 @@ impl Application for MyApp {
             .style(iced::theme::Text::Color(Color::from_rgb(0.74, 0.76, 0.84)));
 
         let status_text_label = if self.is_luna_installed {
-            text("Installed ✓")
+            let installed_label = if cfg!(target_os = "windows") {
+                "Installed"
+            } else {
+                "Installed ✓"
+            };
+
+            text(installed_label)
                 .size(15)
                 .style(iced::theme::Text::Color(Color::from_rgb(0.64, 0.95, 0.68)))
         } else {
@@ -449,12 +501,33 @@ impl Application for MyApp {
             .padding(10)
         };
 
-        let path_label = text("Installation Path (optional)")
+        let path_label = text("Custom Path (optional)")
             .size(16);
+
+        let detected_path_label = text("Detected TIDAL installation path")
+            .size(16);
+        let detected_path_description = text("Used by default. If you enter a custom path below (click advanced options first), it overrides this selection.")
+            .size(12)
+            .style(iced::theme::Text::Color(Color::from_rgb(0.7, 0.72, 0.78)));
+
+        let selected_detected_path = if self.selected_install_path.trim().is_empty() {
+            None
+        } else {
+            Some(&self.selected_install_path)
+        };
+
+        let detected_path_pick = combo_box(
+            &self.install_path_pick_list,
+            "No detected TIDAL installation paths",
+            selected_detected_path,
+            Message::InstallPathOptionSelected,
+        )
+        .width(Length::Fill)
+        .padding(10);
 
         let path_input = text_input(
             "Leave empty for default Tidal directory",
-            &self.install_path,
+            &self.custom_install_path,
         )
         .on_input(Message::InstallPathChanged)
         .padding(10)
@@ -580,10 +653,18 @@ impl Application for MyApp {
                     LogLevel::SubStep => Color::from_rgb(0.4, 0.4, 0.4),
                 };
 
-                let prefix = match entry.level {
-                    LogLevel::Step => "▶ ",
-                    LogLevel::SubStep => "  → ",
-                    _ => "• ",
+                let prefix = if cfg!(target_os = "windows") {
+                    match entry.level {
+                        LogLevel::Step => ">> ",
+                        LogLevel::SubStep => "  -> ",
+                        _ => "* ",
+                    }
+                } else {
+                    match entry.level {
+                        LogLevel::Step => "▶ ",
+                        LogLevel::SubStep => "  → ",
+                        _ => "• ",
+                    }
                 };
 
                 let timestamp_secs = entry.timestamp / 1000;
@@ -681,6 +762,13 @@ impl Application for MyApp {
                                 .width(200)
                                 .push(advanced_toggle),
                         ),
+                )
+                .push(
+                    Column::new()
+                        .spacing(6)
+                        .push(detected_path_label)
+                        .push(detected_path_description)
+                        .push(detected_path_pick),
                 )
                 .push(if self.is_advanced_open {
                     Row::new().spacing(10).push(advanced_section)
@@ -809,27 +897,31 @@ async fn check_installation_async(runtime: Arc<Runtime>) -> bool {
     result.unwrap_or(false)
 }
 
-async fn get_default_install_path_async(runtime: Arc<Runtime>) -> String {
+async fn detect_tidal_paths_async(runtime: Arc<Runtime>) -> Result<Vec<String>, String> {
     let result = runtime
         .spawn(async move {
-            match get_tidal_directory().await {
-                Ok(path) => path.to_string_lossy().to_string(),
-                Err(_) => String::new(),
-            }
+            find_tidal_directories()
+                .await
+                .map(|paths| paths.into_iter().map(|p| p.to_string_lossy().to_string()).collect())
         })
         .await;
 
-    result.unwrap_or_default()
+    match result {
+        Ok(Ok(paths)) => Ok(paths),
+        Ok(Err(err)) => Err(err.to_string()),
+        Err(_) => Err("Failed to detect TIDAL paths: task cancelled".to_string()),
+    }
 }
 
 async fn install_async(
     releases: Vec<AppRelease>,
     channel: String,
     version: String,
-    path: String,
-    sender: Option<UnboundedSender<Message>>,
+    selected_path: String,
+    custom_path: String,
+    reinstall_mode: bool,
     runtime: Arc<Runtime>,
-) -> Result<(), String> {
+) -> Result<InstallExecutionResult, String> {
     let result = runtime.spawn(async move {
         let selected_release = releases
             .iter()
@@ -842,21 +934,25 @@ async fn install_async(
             .find(|v| v.version == version)
             .ok_or_else(|| format!("Version '{}' not found in channel '{}'", version, channel))?;
 
-        let final_path = if !path.trim().is_empty() {
-            normalize_tidal_resources_path(PathBuf::from(path))
+        let final_path = if !custom_path.trim().is_empty() {
+            normalize_tidal_resources_path(PathBuf::from(custom_path))
+        } else if !selected_path.trim().is_empty() {
+            normalize_tidal_resources_path(PathBuf::from(selected_path))
         } else {
-            get_tidal_directory()
-                .await
-                .map_err(|e| format!("Failed to get Tidal directory: {}", e))?
+            return Err("No TIDAL path selected".to_string());
         };
 
         let mut manager = InstallManager::new();
+        let collected_logs = Arc::new(Mutex::new(Vec::<InstallExecutionLog>::new()));
+        let install_success = Arc::new(Mutex::new(true));
 
-        manager.add_step(Box::new(SetupStep {
-            overwrite_path: Some(final_path.clone()),
-        }));
         manager.add_step(Box::new(KillTidalStep));
-        manager.add_step(Box::new(UninstallStep {
+        if reinstall_mode {
+            manager.add_step(Box::new(ReinstallCleanupStep {
+                overwrite_path: Some(final_path.clone()),
+            }));
+        }
+        manager.add_step(Box::new(SetupStep {
             overwrite_path: Some(final_path.clone()),
         }));
         manager.add_step(Box::new(DownloadLunaStep {
@@ -875,37 +971,51 @@ async fn install_async(
             suppress_console_window: true,
         }));
 
+        let logs_for_sub = Arc::clone(&collected_logs);
+        let logs_for_step = Arc::clone(&collected_logs);
+        let logs_for_start = Arc::clone(&collected_logs);
+        let success_for_end = Arc::clone(&install_success);
+
         manager
             .run(
                 |sublog| {
-                    if let Some(sender) = &sender {
-                        let _ = sender.send(Message::InstallationSubStep(sublog.to_string()));
+                    if let Ok(mut logs) = logs_for_sub.lock() {
+                        logs.push(InstallExecutionLog {
+                            message: sublog,
+                            is_substep: true,
+                        });
                     }
                 },
                 |steplog| {
-                    if let Some(sender) = &sender {
-                        let _ = sender.send(Message::InstallationStep(steplog.to_string()));
+                    if let Ok(mut logs) = logs_for_step.lock() {
+                        logs.push(InstallExecutionLog {
+                            message: steplog,
+                            is_substep: false,
+                        });
                     }
                 },
                 |step_name| {
-                    if let Some(sender) = &sender {
-                        let _ = sender.send(Message::InstallationStep(format!(
-                            "=== {} ===",
-                            step_name
-                        )));
+                    if let Ok(mut logs) = logs_for_start.lock() {
+                        logs.push(InstallExecutionLog {
+                            message: format!("=== {} ===", step_name),
+                            is_substep: false,
+                        });
                     }
                 },
                 |success| {
-                    if let Some(sender) = &sender {
-                        if !success {
-                            let _ = sender.send(Message::InstallationStep("Step failed!".to_string()));
+                    if !success {
+                        if let Ok(mut flag) = success_for_end.lock() {
+                            *flag = false;
                         }
                     }
                 },
             )
             .await;
 
-        Ok(())
+        let logs = collected_logs.lock().map(|logs| logs.clone()).unwrap_or_default();
+        let success = install_success.lock().map(|flag| *flag).unwrap_or(false);
+
+        Ok(InstallExecutionResult { logs, success })
     }).await;
 
     match result {
@@ -915,20 +1025,22 @@ async fn install_async(
 }
 
 async fn uninstall_async(
-    path: String,
-    sender: Option<UnboundedSender<Message>>,
+    selected_path: String,
+    custom_path: String,
     runtime: Arc<Runtime>,
-) -> Result<(), String> {
+) -> Result<InstallExecutionResult, String> {
     let result = runtime.spawn(async move {
-        let final_path = if !path.trim().is_empty() {
-            normalize_tidal_resources_path(PathBuf::from(path))
+        let final_path = if !custom_path.trim().is_empty() {
+            normalize_tidal_resources_path(PathBuf::from(custom_path))
+        } else if !selected_path.trim().is_empty() {
+            normalize_tidal_resources_path(PathBuf::from(selected_path))
         } else {
-            get_tidal_directory()
-                .await
-                .map_err(|e| format!("Failed to get Tidal directory: {}", e))?
+            return Err("No TIDAL path selected".to_string());
         };
 
         let mut manager = InstallManager::new();
+        let collected_logs = Arc::new(Mutex::new(Vec::<InstallExecutionLog>::new()));
+        let uninstall_success = Arc::new(Mutex::new(true));
 
         manager.add_step(Box::new(KillTidalStep));
         manager.add_step(Box::new(CopyAsarUninstallStep {
@@ -943,37 +1055,51 @@ async fn uninstall_async(
             suppress_console_window: true,
         }));
 
+        let logs_for_sub = Arc::clone(&collected_logs);
+        let logs_for_step = Arc::clone(&collected_logs);
+        let logs_for_start = Arc::clone(&collected_logs);
+        let success_for_end = Arc::clone(&uninstall_success);
+
         manager
             .run(
                 |sublog| {
-                    if let Some(sender) = &sender {
-                        let _ = sender.send(Message::InstallationSubStep(sublog.to_string()));
+                    if let Ok(mut logs) = logs_for_sub.lock() {
+                        logs.push(InstallExecutionLog {
+                            message: sublog,
+                            is_substep: true,
+                        });
                     }
                 },
                 |steplog| {
-                    if let Some(sender) = &sender {
-                        let _ = sender.send(Message::InstallationStep(steplog.to_string()));
+                    if let Ok(mut logs) = logs_for_step.lock() {
+                        logs.push(InstallExecutionLog {
+                            message: steplog,
+                            is_substep: false,
+                        });
                     }
                 },
                 |step_name| {
-                    if let Some(sender) = &sender {
-                        let _ = sender.send(Message::InstallationStep(format!(
-                            "=== {} ===",
-                            step_name
-                        )));
+                    if let Ok(mut logs) = logs_for_start.lock() {
+                        logs.push(InstallExecutionLog {
+                            message: format!("=== {} ===", step_name),
+                            is_substep: false,
+                        });
                     }
                 },
                 |success| {
-                    if let Some(sender) = &sender {
-                        if !success {
-                            let _ = sender.send(Message::InstallationStep("Step failed!".to_string()));
+                    if !success {
+                        if let Ok(mut flag) = success_for_end.lock() {
+                            *flag = false;
                         }
                     }
                 },
             )
             .await;
 
-        Ok(())
+        let logs = collected_logs.lock().map(|logs| logs.clone()).unwrap_or_default();
+        let success = uninstall_success.lock().map(|flag| *flag).unwrap_or(false);
+
+        Ok(InstallExecutionResult { logs, success })
     }).await;
 
     match result {
