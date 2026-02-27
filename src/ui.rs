@@ -23,6 +23,11 @@ use tasks::{
     uninstall_async,
 };
 
+fn load_app_icon() -> Option<iced::window::Icon> {
+    let icon_bytes = include_bytes!("../resources/icon.png");
+    iced::window::icon::from_file_data(icon_bytes, None).ok()
+}
+
 impl Default for MyApp {
     fn default() -> Self {
         let channel_pick_list = combo_box::State::new(vec![]);
@@ -1133,6 +1138,7 @@ pub fn run_gui() -> iced::Result {
         window: iced::window::Settings {
             size: Size::new(1000.0, 700.0),
             min_size: Some(Size::new(800.0, 500.0)),
+            icon: load_app_icon(),
             ..iced::window::Settings::default()
         },
         antialiasing: true,

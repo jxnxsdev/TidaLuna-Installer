@@ -123,6 +123,7 @@ jobs:
           mkdir -p debpkg/opt/tidaluna-installer
           mkdir -p debpkg/usr/bin
           mkdir -p debpkg/usr/share/applications
+          mkdir -p debpkg/usr/share/icons/hicolor/256x256/apps
 
           cat > debpkg/DEBIAN/control <<EOF
           Package: tidaluna-installer
@@ -154,6 +155,8 @@ jobs:
           StartupNotify=true
           EOF
 
+          cp resources/icon.png debpkg/usr/share/icons/hicolor/256x256/apps/tidaluna-installer.png
+
           dpkg-deb --build debpkg ./installer-linux-x86_64-${TAG}.deb
 
           mkdir -p AppDir/usr/bin
@@ -184,33 +187,8 @@ jobs:
 
           cp AppDir/tidaluna-installer.desktop AppDir/usr/share/applications/tidaluna-installer.desktop
 
-          python3 - <<'PY'
-          import struct, zlib
-          width = height = 1
-          bit_depth = 8
-          color_type = 6
-          ihdr = struct.pack(">IIBBBBB", width, height, bit_depth, color_type, 0, 0, 0)
-
-          def chunk(kind, data):
-              return (
-                  struct.pack(">I", len(data))
-                  + kind
-                  + data
-                  + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
-              )
-
-          raw = b"\x00\x40\x7A\xF6\xFF"
-          png = (
-              b"\x89PNG\r\n\x1a\n"
-              + chunk(b"IHDR", ihdr)
-              + chunk(b"IDAT", zlib.compress(raw, 9))
-              + chunk(b"IEND", b"")
-          )
-          with open("AppDir/tidaluna-installer.png", "wb") as file:
-              file.write(png)
-          PY
-
-          cp AppDir/tidaluna-installer.png AppDir/usr/share/icons/hicolor/256x256/apps/tidaluna-installer.png
+            cp resources/icon.png AppDir/tidaluna-installer.png
+            cp resources/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/tidaluna-installer.png
 
           curl -L -o appimagetool.AppImage \
             https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
@@ -249,6 +227,7 @@ jobs:
 
           cp ./installer-macOS-x86_64-${TAG} "${APP_DIR}/Contents/MacOS/tidaluna-installer"
           chmod +x "${APP_DIR}/Contents/MacOS/tidaluna-installer"
+          cp resources/icon.png "${APP_DIR}/Contents/Resources/icon.png"
 
           cat > "${APP_DIR}/Contents/Info.plist" <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
@@ -271,6 +250,8 @@ jobs:
             <string>1</string>
             <key>LSMinimumSystemVersion</key>
             <string>11.0</string>
+            <key>CFBundleIconFile</key>
+            <string>icon.png</string>
           </dict>
           </plist>
           EOF
@@ -296,6 +277,7 @@ jobs:
 
           cp ./installer-macOS-aarch64-${TAG} "${APP_DIR}/Contents/MacOS/tidaluna-installer"
           chmod +x "${APP_DIR}/Contents/MacOS/tidaluna-installer"
+          cp resources/icon.png "${APP_DIR}/Contents/Resources/icon.png"
 
           cat > "${APP_DIR}/Contents/Info.plist" <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
@@ -318,6 +300,8 @@ jobs:
             <string>1</string>
             <key>LSMinimumSystemVersion</key>
             <string>11.0</string>
+            <key>CFBundleIconFile</key>
+            <string>icon.png</string>
           </dict>
           </plist>
           EOF
