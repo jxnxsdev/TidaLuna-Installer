@@ -12,6 +12,8 @@ jobs:
   Build:
     name: Build ${{ matrix.platform.os-name }}
     runs-on: ${{ matrix.platform.runs-on }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     strategy:
       matrix:
         platform:
@@ -34,23 +36,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install GitHub CLI (gh)
+      - name: Verify GitHub CLI (gh)
         if: matrix.platform.runs-on != 'windows-latest'
         run: |
-          if command -v apt-get &> /dev/null; then
-            sudo apt update
-            sudo apt install -y gh
-          elif command -v brew &> /dev/null; then
-            brew install gh
+          if ! command -v gh &> /dev/null; then
+            echo "GitHub CLI (gh) is not available on this runner"
+            exit 1
           fi
+          gh --version
 
-      - name: Install GitHub CLI (gh) on Windows
+      - name: Verify GitHub CLI (gh) on Windows
         if: matrix.platform.runs-on == 'windows-latest'
         run: |
-          choco install gh
-
-      - name: Authenticate GitHub CLI
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh --version
 
       - name: Get next version (Unix)
         if: matrix.platform.runs-on != 'windows-latest'
@@ -161,18 +159,16 @@ jobs:
     name: Create Release with Auto-Version
     needs: Build
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install GitHub CLI (gh)
+      - name: Verify GitHub CLI (gh)
         run: |
-          sudo apt update
-          sudo apt install -y gh
-
-      - name: Authenticate GitHub CLI
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh --version
 
       - name: Get next version
         id: get_tag
