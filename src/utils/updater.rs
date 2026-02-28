@@ -7,6 +7,12 @@ use std::path::PathBuf;
 
 const INSTALLER_RELEASES_API: &str = "https://api.github.com/repos/jxnxsdev/TidaLuna-Installer/releases/latest";
 
+pub fn current_installer_version() -> String {
+    option_env!("TIDALUNA_INSTALLER_VERSION")
+        .unwrap_or(env!("CARGO_PKG_VERSION"))
+        .to_string()
+}
+
 #[derive(Debug, Clone)]
 pub struct UpdateInfo {
     pub version: String,

@@ -83,8 +83,8 @@ async fn resolve_cli_tidal_path(user_path: &Option<String>) -> io::Result<PathBu
 pub async fn run_cli(args: Args) {
     println!("TidaLuna Installer CLI\n");
 
-    let current_version = env!("CARGO_PKG_VERSION");
-    let available_update = match updater::check_for_update(current_version).await {
+    let current_version = updater::current_installer_version();
+    let available_update = match updater::check_for_update(&current_version).await {
         Ok(update) => update,
         Err(error) => {
             eprintln!("Installer update check failed: {}", error);

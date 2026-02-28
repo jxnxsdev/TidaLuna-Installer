@@ -12,6 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::runtime::Runtime;
 use semver::Version;
 use std::sync::Arc;
+use crate::utils::updater;
 
 mod models;
 mod tasks;
@@ -53,7 +54,7 @@ impl Default for MyApp {
             stargazers: Vec::new(),
             stargazers_error: None,
             stargazers_page: 0,
-            current_installer_version: env!("CARGO_PKG_VERSION").to_string(),
+            current_installer_version: updater::current_installer_version(),
             available_installer_update: None,
             show_installer_update_prompt: false,
             is_applying_installer_update: false,
@@ -304,11 +305,6 @@ impl Application for MyApp {
             }
 
             Message::Install => {
-                if self.show_installer_update_prompt || self.is_applying_installer_update {
-                    self.add_log("Update prompt is active. Complete or skip the installer update first.", LogLevel::Info);
-                    return Command::none();
-                }
-
                 if self.custom_install_path.trim().is_empty() && self.selected_install_path.trim().is_empty() {
                     self.add_log("No TIDAL path selected. Choose one from the dropdown or enter a custom path in Advanced Options.", LogLevel::Error);
                     return Command::none();
@@ -333,11 +329,6 @@ impl Application for MyApp {
             }
 
             Message::Uninstall => {
-                if self.show_installer_update_prompt || self.is_applying_installer_update {
-                    self.add_log("Update prompt is active. Complete or skip the installer update first.", LogLevel::Info);
-                    return Command::none();
-                }
-
                 if self.custom_install_path.trim().is_empty() && self.selected_install_path.trim().is_empty() {
                     self.add_log("No TIDAL path selected. Choose one from the dropdown or enter a custom path in Advanced Options.", LogLevel::Error);
                     return Command::none();
