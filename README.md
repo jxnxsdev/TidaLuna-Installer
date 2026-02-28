@@ -2,6 +2,8 @@
 
 # TidaLuna Installer
 
+# NOTE: If you are facing issues with the current installer not working, please use version 2.1.17 and refer to the guide at https://luna-wiki.jxnxsdev.de!
+
 
 <p align="center">
   <a href="https://github.com/jxnxsdev/TidaLuna-Installer/releases">
@@ -28,9 +30,47 @@ TidaLuna Installer is a cross-platform application that makes installing and man
 
 ## Installation Instructions
 
-For all installation and usage instructions, please see the TidaLuna Wiki:
+### Getting Started:
+1. Download the appropriate binary for your platform from the [Releases page](https://github.com/jxnxsdev/TidaLuna-Installer/releases)
+2. Run the installer according to your platform (see below for platform-specific instructions)
+3. Select your preferred release channel and version
+4. Click "Install" to begin the installation process
 
 [https://luna-wiki.jxnxsdev.de](https://luna-wiki.jxnxsdev.de)
+
+### Platform-specific Instructions:
+
+#### Windows
+- Double-click the downloaded `installer-windows-x86_64-vX.X.X.exe` to run.
+
+#### Linux
+- Open a terminal in the directory where you downloaded the installer.
+- Make the installer executable (if needed): `chmod +x installer-linux-x86_64-vX.X.X`
+- Run the installer: `./installer-linux-x86_64-vX.X.X`
+
+#### macOS
+1. Download the installer for your architecture (Intel or Apple Silicon) from the Releases page.
+2. Open a terminal and navigate to the directory where the installer was downloaded.
+3. You will need to give the installer system access executable permission. Run the following commands (replace `installer-macOS-x86_64-vX.X.X` with the actual file name for Intel, or `installer-macOS-aarch64-vX.X.X` for Apple Silicon):
+
+   ```bash
+   xattr -d com.apple.quarantine installer-macOS-x86_64-vX.X.X
+   codesign -s - -f --deep installer-macOS-x86_64-vX.X.X
+   chmod +x installer-macOS-x86_64-vX.X.X
+   ```
+
+   **WARNING**: If you skip this step, you will get an error when trying to run the installer: `zsh: killed installer-macOS-x86_64-vX.X.X`
+
+4. Allow the installer to access and modify the TIDAL app. For that, do the following:
+   - Open the Settings app of your Mac.
+   - Navigate to Privacy and Security → App Management
+   - Check "Terminal" to allow it to update / delete other applications.
+
+5. Now you can run the installer by executing the following command in the terminal (again, replace the file name with the actual one):
+
+   ```bash
+   ./installer-macOS-x86_64-vX.X.X
+   ```
 
 ## Downloads
 
@@ -60,3 +100,7 @@ This project is licensed under the **MIT License**.
 
 See the LICENSE file for full details:
 [https://github.com/jxnxsdev/TidaLuna-Installer/blob/main/LICENSE](https://github.com/jxnxsdev/TidaLuna-Installer/blob/main/LICENSE)
+
+---
+
+**Note for macOS users**: The additional steps (xattr, codesign, chmod, and App Management permission) are required due to macOS security features. These steps ensure the installer can run properly and modify the TIDAL application.
