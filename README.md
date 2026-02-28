@@ -2,9 +2,6 @@
 
 # TidaLuna Installer
 
-# NOTE: If you are facing issues with the current installer not working, please use version 2.1.17 and refer to the guide at https://luna-wiki.jxnxsdev.de!
-
-
 <p align="center">
   <a href="https://github.com/jxnxsdev/TidaLuna-Installer/releases">
     <img src="https://img.shields.io/github/v/release/jxnxsdev/TidaLuna-Installer?style=for-the-badge" />
