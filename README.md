@@ -2,7 +2,6 @@
 
 # TidaLuna Installer
 
-
 <p align="center">
   <a href="https://github.com/jxnxsdev/TidaLuna-Installer/releases">
     <img src="https://img.shields.io/github/v/release/jxnxsdev/TidaLuna-Installer?style=for-the-badge" />
