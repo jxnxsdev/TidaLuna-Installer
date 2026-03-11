@@ -149,6 +149,18 @@ pub async fn get_tidal_directory() -> io::Result<PathBuf> {
     ))
 }
 
+pub async fn get_latest_tidal_directory() -> io::Result<PathBuf> {
+    let candidates = find_tidal_directories().await?;
+    if let Some(path) = candidates.first() {
+        return Ok(path.clone());
+    }
+
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        "TIDAL resources directory not found",
+    ))
+}
+
 pub async fn find_tidal_directories() -> io::Result<Vec<PathBuf>> {
     let platform = std::env::consts::OS;
 
@@ -286,12 +298,12 @@ pub async fn find_tidal_directories() -> io::Result<Vec<PathBuf>> {
 
 /// Check if Luna is installed
 pub async fn is_luna_installed() -> io::Result<bool> {
-    let tidal_dirs = match find_tidal_directories().await {
-        Ok(paths) => paths,
+    let latest_dir = match get_latest_tidal_directory().await {
+        Ok(path) => path,
         Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(false),
         Err(err) => return Err(err),
     };
 
-    Ok(tidal_dirs.iter().any(|path| path.join("app").exists()))
+    Ok(latest_dir.join("app").exists())
 }
 

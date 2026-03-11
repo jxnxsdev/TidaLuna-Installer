@@ -11,7 +11,7 @@ use args::Args;
 fn main() {
     let args = Args::parse();
 
-    if args.headless {
+    if args.headless || args.ensure_latest || args.guard {
         match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()

@@ -35,4 +35,12 @@ pub struct Args {
     /// Update the installer binary to the latest release
     #[arg(long)]
     pub update: bool,
+
+    /// Ensure TidaLuna is installed on the latest TIDAL version
+    #[arg(long)]
+    pub ensure_latest: bool,
+
+    /// Guard mode: prompt when a new TIDAL version needs patching
+    #[arg(long)]
+    pub guard: bool,
 }

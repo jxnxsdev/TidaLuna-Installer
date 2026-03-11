@@ -1,7 +1,11 @@
 use crate::args::Args;
 use crate::utils::{
     release_loader::ReleaseLoader,
-    fs_helpers::{find_tidal_directories, is_luna_installed, normalize_tidal_resources_path},
+    fs_helpers::{
+        find_tidal_directories, get_latest_tidal_directory, is_luna_installed,
+        normalize_tidal_resources_path,
+    },
+    startup_guard,
     updater,
 };
 use std::io::{self, Write};
@@ -58,6 +62,97 @@ fn prompt_user_for_tidal_path(paths: &[PathBuf]) -> io::Result<PathBuf> {
 
         println!("Invalid selection. Please enter a number between 1 and {}.", paths.len());
     }
+}
+
+fn prompt_guard_reinstall() -> io::Result<bool> {
+    println!(
+        "TidaLuna has detected a TIDAL update - Press y to reinstall TidaLuna, or n to stop receiving this warning."
+    );
+
+    loop {
+        print!("Enter selection (y/n): ");
+        io::stdout().flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let trimmed = input.trim().to_lowercase();
+
+        match trimmed.as_str() {
+            "y" | "yes" => return Ok(true),
+            "n" | "no" => return Ok(false),
+            _ => println!("Invalid selection. Please enter y or n."),
+        }
+    }
+}
+
+async fn install_latest_to_path(latest_path: PathBuf) -> Result<(), String> {
+    let mut loader = ReleaseLoader::new(
+        "https://raw.githubusercontent.com/jxnxsdev/TidaLuna-Installer/main/resources/sources.json",
+    );
+
+    let releases = loader
+        .load_releases()
+        .await
+        .map_err(|e| format!("Failed to load releases: {}", e))?;
+
+    let selected_release = releases
+        .iter()
+        .find(|r| r.name == "stable")
+        .or_else(|| releases.iter().find(|r| r.name == "beta"))
+        .or_else(|| releases.iter().find(|r| r.name == "alpha"))
+        .ok_or_else(|| "No release found to install!".to_string())?;
+
+    let latest_version = selected_release
+        .versions
+        .iter()
+        .max_by(|a, b| {
+            let va = Version::parse(&a.version).unwrap_or_else(|_| Version::new(0, 0, 0));
+            let vb = Version::parse(&b.version).unwrap_or_else(|_| Version::new(0, 0, 0));
+            va.cmp(&vb)
+        })
+        .ok_or_else(|| {
+            format!(
+                "Selected release channel '{}' has no versions",
+                selected_release.name
+            )
+        })?;
+
+    println!(
+        "\nEnsuring {} version {} is installed at {:?}\n",
+        selected_release.name, latest_version.version, latest_path
+    );
+
+    let mut manager = InstallManager::new();
+    manager.add_step(Box::new(KillTidalStep));
+    manager.add_step(Box::new(SetupStep {
+        overwrite_path: Some(latest_path.clone()),
+    }));
+    manager.add_step(Box::new(DownloadLunaStep {
+        download_url: latest_version.download.clone(),
+    }));
+    manager.add_step(Box::new(ExtractLunaStep));
+    manager.add_step(Box::new(CopyAsarInstallStep {
+        overwrite_path: Some(latest_path.clone()),
+    }));
+    manager.add_step(Box::new(InsertLunaStep {
+        overwrite_path: Some(latest_path.clone()),
+    }));
+    manager.add_step(Box::new(SignTidalStep));
+
+    manager
+        .run(
+            |sublog| println!("    {}", sublog),
+            |steplog| println!("{}", steplog),
+            |step_name| print_step_separator(&step_name),
+            |success| {
+                if !success {
+                    print_failure_banner("Step Failed", "See above for details.");
+                }
+            },
+        )
+        .await;
+
+    Ok(())
 }
 
 async fn resolve_cli_tidal_path(user_path: &Option<String>) -> io::Result<PathBuf> {
@@ -120,6 +215,67 @@ pub async fn run_cli(args: Args) {
                 println!("Installer is already up to date (v{}).", current_version);
             }
         }
+        return;
+    }
+
+    if args.guard {
+        let latest_path = match get_latest_tidal_directory().await {
+            Ok(path) => path,
+            Err(_) => return,
+        };
+
+        match is_luna_installed().await {
+            Ok(true) => return,
+            Ok(false) => {}
+            Err(_) => return,
+        }
+
+        match prompt_guard_reinstall() {
+            Ok(true) => {
+                if let Err(err) = install_latest_to_path(latest_path).await {
+                    eprintln!("{}", err);
+                }
+            }
+            Ok(false) => {
+                if let Err(err) = startup_guard::set_guard_enabled(false) {
+                    eprintln!("Failed to disable startup guard: {}", err);
+                } else {
+                    println!("Startup guard disabled.");
+                }
+            }
+            Err(err) => {
+                eprintln!("Failed to read input: {}", err);
+            }
+        }
+
+        return;
+    }
+
+    if args.ensure_latest {
+        let latest_path = match get_latest_tidal_directory().await {
+            Ok(path) => path,
+            Err(err) => {
+                eprintln!("Failed to find latest TIDAL resources directory: {}", err);
+                return;
+            }
+        };
+
+        match is_luna_installed().await {
+            Ok(true) => {
+                println!("TidaLuna is already installed on the latest TIDAL version.");
+                return;
+            }
+            Ok(false) => {}
+            Err(err) => {
+                eprintln!("Failed to check latest installation status: {}", err);
+                return;
+            }
+        }
+
+        if let Err(err) = install_latest_to_path(latest_path).await {
+            eprintln!("{}", err);
+        }
+
         return;
     }
 

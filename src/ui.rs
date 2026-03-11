@@ -19,9 +19,9 @@ mod tasks;
 
 use models::{LogEntry, LogLevel, Message, MyApp};
 use tasks::{
-    apply_installer_update_async, check_installation_async, check_installer_update_async,
-    detect_tidal_paths_async, install_async, load_releases_async, load_stargazers_async,
-    uninstall_async,
+    apply_installer_update_async, check_guard_status_async, check_installation_async,
+    check_installer_update_async, detect_tidal_paths_async, install_async, load_releases_async,
+    load_stargazers_async, set_guard_enabled_async, uninstall_async,
 };
 
 fn load_app_icon() -> Option<iced::window::Icon> {
@@ -47,6 +47,9 @@ impl Default for MyApp {
             is_advanced_open: false,
             is_luna_installed: false,
             is_loading_stargazers: true,
+            is_guard_enabled: false,
+            is_guard_setting: false,
+            guard_prev_state: None,
             channel_pick_list,
             version_pick_list,
             install_path_pick_list,
@@ -88,6 +91,11 @@ impl Application for MyApp {
         );
         let detect_paths = Command::perform(detect_tidal_paths_async(app.runtime.clone()), Message::TidalPathsDetected);
         let load_stargazers = Command::perform(load_stargazers_async(app.runtime.clone()), Message::StargazersLoaded);
+        let check_guard = if cfg!(target_os = "windows") {
+            Command::perform(check_guard_status_async(app.runtime.clone()), Message::GuardStatus)
+        } else {
+            Command::none()
+        };
 
         let cmd = Command::batch(vec![
             Command::perform(async {}, |_| Message::LoadReleases),
@@ -96,6 +104,7 @@ impl Application for MyApp {
             check_update,
             detect_paths,
             load_stargazers,
+            check_guard,
         ]);
 
         (app, cmd)
@@ -210,6 +219,66 @@ impl Application for MyApp {
                     }
                     Err(err) => {
                         self.add_log(&format!("Installer update failed: {}", err), LogLevel::Error);
+                    }
+                }
+
+                Command::none()
+            }
+
+            Message::GuardStatus(result) => {
+                match result {
+                    Ok(enabled) => {
+                        self.is_guard_enabled = enabled;
+                    }
+                    Err(err) => {
+                        self.add_log(&format!("Failed to check guard status: {}", err), LogLevel::Info);
+                    }
+                }
+                Command::none()
+            }
+
+            Message::ToggleGuard(enabled) => {
+                if self.is_guard_setting {
+                    return Command::none();
+                }
+
+                self.guard_prev_state = Some(self.is_guard_enabled);
+                self.is_guard_enabled = enabled;
+                self.is_guard_setting = true;
+                self.add_log(
+                    if enabled {
+                        "Enabling Windows startup guard..."
+                    } else {
+                        "Disabling Windows startup guard..."
+                    },
+                    LogLevel::Info,
+                );
+
+                let runtime = self.runtime.clone();
+                Command::perform(set_guard_enabled_async(runtime, enabled), Message::GuardUpdated)
+            }
+
+            Message::GuardUpdated(result) => {
+                self.is_guard_setting = false;
+
+                match result {
+                    Ok(enabled) => {
+                        self.is_guard_enabled = enabled;
+                        self.guard_prev_state = None;
+                        self.add_log(
+                            if enabled {
+                                "Windows startup guard enabled"
+                            } else {
+                                "Windows startup guard disabled"
+                            },
+                            LogLevel::Success,
+                        );
+                    }
+                    Err(err) => {
+                        if let Some(previous) = self.guard_prev_state.take() {
+                            self.is_guard_enabled = previous;
+                        }
+                        self.add_log(&format!("Failed to update guard status: {}", err), LogLevel::Error);
                     }
                 }
 
@@ -577,13 +646,49 @@ impl Application for MyApp {
             .on_toggle(|checked| Message::ToggleAdvancedOptions(checked))
             .size(16);
 
-        let advanced_section = if self.is_advanced_open {
-            Row::new()
-                .spacing(10)
-                .push(path_label.width(180))
-                .push(path_input)
+        let guard_controls: Option<Element<Message>> = if cfg!(target_os = "windows") {
+            let guard_checkbox: Element<Message> = if self.is_guard_setting {
+                checkbox("Auto-patch TIDAL updates on startup", self.is_guard_enabled)
+                    .size(15)
+                    .into()
+            } else {
+                checkbox("Auto-patch TIDAL updates on startup", self.is_guard_enabled)
+                    .on_toggle(Message::ToggleGuard)
+                    .size(15)
+                    .into()
+            };
+
+            let guard_description: Element<Message> = text(
+                "Runs at login to reapply TidaLuna if a new TIDAL version is detected.",
+            )
+            .size(12)
+            .style(iced::theme::Text::Color(Color::from_rgb(0.7, 0.72, 0.78)))
+            .into();
+
+            Some(
+                Column::new()
+                    .spacing(4)
+                    .push(guard_checkbox)
+                    .push(guard_description)
+                    .into(),
+            )
         } else {
-            Row::new()
+            None
+        };
+
+        let advanced_section: Element<Message> = if self.is_advanced_open {
+            let section = Column::new()
+                .spacing(12)
+                .push(
+                    Row::new()
+                        .spacing(10)
+                        .push(path_label.width(180))
+                        .push(path_input),
+                );
+
+            section.into()
+        } else {
+            Row::new().into()
         };
 
         let install_button_text = if self.is_luna_installed {
@@ -811,11 +916,15 @@ impl Application for MyApp {
                         .push(detected_path_description)
                         .push(detected_path_pick),
                 )
-                .push(if self.is_advanced_open {
-                    Row::new().spacing(10).push(advanced_section)
-                } else {
-                    Row::new()
+                .push({
+                    let guard_block: Element<Message> = if let Some(guard_controls) = guard_controls {
+                        Column::new().spacing(6).push(guard_controls).into()
+                    } else {
+                        Column::new().into()
+                    };
+                    guard_block
                 })
+                .push(advanced_section)
                 .push(
                     Row::new()
                         .spacing(15)

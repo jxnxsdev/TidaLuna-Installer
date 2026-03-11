@@ -18,6 +18,7 @@ use crate::installer::{
 use crate::utils::{
     fs_helpers::{find_tidal_directories, is_luna_installed, normalize_tidal_resources_path},
     release_loader::ReleaseLoader,
+    startup_guard,
     updater,
 };
 
@@ -250,6 +251,28 @@ pub async fn check_installation_async(runtime: Arc<Runtime>) -> bool {
     }).await;
 
     result.unwrap_or(false)
+}
+
+pub async fn check_guard_status_async(runtime: Arc<Runtime>) -> Result<bool, String> {
+    let result = runtime
+        .spawn(async move { startup_guard::is_guard_enabled().map_err(|e| e.to_string()) })
+        .await;
+
+    match result {
+        Ok(inner) => inner,
+        Err(_) => Err("Failed to check guard status: task cancelled".to_string()),
+    }
+}
+
+pub async fn set_guard_enabled_async(runtime: Arc<Runtime>, enabled: bool) -> Result<bool, String> {
+    let result = runtime
+        .spawn(async move { startup_guard::set_guard_enabled(enabled).map_err(|e| e.to_string()) })
+        .await;
+
+    match result {
+        Ok(inner) => inner,
+        Err(_) => Err("Failed to update guard status: task cancelled".to_string()),
+    }
 }
 
 pub async fn detect_tidal_paths_async(runtime: Arc<Runtime>) -> Result<Vec<String>, String> {
